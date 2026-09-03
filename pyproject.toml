@@ -12,6 +12,9 @@ authors = [
   { name = "AIR-DV team" },
 ]
 
+[project.scripts]
+air-dv = "air_dv.cli:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

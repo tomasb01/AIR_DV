@@ -15,6 +15,18 @@ Word analysis additionally requires the `docling` command to be available on `PA
 PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -v
 ```
 
+## Command line
+
+Analyse a supported local document and optionally export all outputs:
+
+```bash
+PYTHONPATH=src .venv/bin/python -m air_dv analyse path/to/document.docx \
+  --report report.md --ai-view normalized.md --json result.json
+```
+
+The command supports `.md`, `.docx`, and `.xlsx`. Word analysis requires the local
+`docling` command; all analysis and exports remain on the local machine.
+
 ## Product documents
 
 - [Product specification](product_spec.md)

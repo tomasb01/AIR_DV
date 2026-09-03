@@ -36,6 +36,8 @@ class StructureCheck:
 
         if not document.document.extraction_succeeded:
             return []
+        if document.document.file_type == "xlsx":
+            return []
 
         findings: list[Finding] = []
         headings = [block for block in document.blocks if block.type is BlockType.HEADING]

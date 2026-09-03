@@ -1,6 +1,7 @@
 """Tests for deterministic semantic-heading and section-length checks."""
 
 import unittest
+from dataclasses import replace
 
 from air_dv.checks.structure import StructureCheck, StructureCheckConfig
 from air_dv.normalization import MarkdownNormalizer
@@ -53,3 +54,11 @@ class StructureCheckTests(unittest.TestCase):
         )
 
         self.assertEqual(StructureCheck().run(failed_document), [])
+
+    def test_defers_excel_density_to_the_specialized_excel_check(self) -> None:
+        document = MarkdownNormalizer().normalize_text("workbook.md", "# Sheet: Data\n\n" + "word " * 30)
+        excel_document = replace(document, document=replace(document.document, file_type="xlsx"))
+
+        findings = StructureCheck(StructureCheckConfig(maximum_words_per_section=20)).run(excel_document)
+
+        self.assertEqual(findings, [])
