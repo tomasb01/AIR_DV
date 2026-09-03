@@ -38,6 +38,7 @@ class BlockType(str, Enum):
     LIST_ITEM = "list_item"
     TABLE = "table"
     IMAGE = "image"
+    UNSUPPORTED_OBJECT = "unsupported_object"
 
 
 @dataclass(frozen=True)

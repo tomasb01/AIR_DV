@@ -17,6 +17,9 @@ from air_dv.models import Block, BlockType, DocumentSummary, NormalizedDocument,
 _HEADING_PATTERN = re.compile(r"^(#{1,6})\s+(.+?)(?:\s+#+)?\s*$")
 _LIST_ITEM_PATTERN = re.compile(r"^\s*(?:[-*+]\s+|\d+[.)]\s+)(.+)$")
 _IMAGE_PATTERN = re.compile(r"!\[[^]]*\]\([^)]*\)")
+_OBJECT_PLACEHOLDER_PATTERN = re.compile(
+    r"<!--\s*(?:image|picture|object|drawing)[^>]*-->", re.IGNORECASE
+)
 
 
 class MarkdownNormalizer:
@@ -66,6 +69,18 @@ class MarkdownNormalizer:
 
             if line.lstrip().startswith("|"):
                 index = self._collect_table(lines, index, blocks, source_label)
+                continue
+
+            object_match = _OBJECT_PLACEHOLDER_PATTERN.search(line)
+            if object_match:
+                blocks.append(
+                    Block(
+                        type=BlockType.UNSUPPORTED_OBJECT,
+                        text=object_match.group(0),
+                        location=SourceLocation(label=source_label, line_start=line_number),
+                    )
+                )
+                index += 1
                 continue
 
             image_match = _IMAGE_PATTERN.search(line)
@@ -135,7 +150,11 @@ class MarkdownNormalizer:
             line = lines[index]
             if not line.strip() or _HEADING_PATTERN.match(line) or line.lstrip().startswith("|"):
                 break
-            if _LIST_ITEM_PATTERN.match(line) or _IMAGE_PATTERN.search(line):
+            if (
+                _LIST_ITEM_PATTERN.match(line)
+                or _IMAGE_PATTERN.search(line)
+                or _OBJECT_PLACEHOLDER_PATTERN.search(line)
+            ):
                 break
             paragraph_lines.append(line)
             index += 1

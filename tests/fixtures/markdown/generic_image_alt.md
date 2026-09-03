@@ -1,0 +1,4 @@
+# Architecture
+
+![Diagram](architecture.png)
+
