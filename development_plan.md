@@ -6,6 +6,37 @@ Navazuje na [product_spec.md](product_spec.md). Cílem je ukázat během krátk�
 
 Produktový jazyk je **angličtina**. Anglicky budou všechny prvky, které mohou vidět uživatelé či budoucí integrace: UI, findings, doporučení, reporty, exportovaný AI view, CLI výstup a chybové zprávy. Stejně tak zdrojový kód používá anglické názvy a případné komentáře v angličtině. Lokalizace není součástí MVP.
 
+## Aktuální stav vývoje — 3. září 2026
+
+Poslední publikovaný commit: `d092f8d` na větvi `main`.
+
+### Dokončeno
+
+- **Fáze 0:** projektová kostra, serializovatelný datový kontrakt findings a testy.
+- **Fáze 1:** normalizace Markdownu, Wordu přes Docling a Excelu přes `openpyxl`; Excel zachovává workbook, sheet, rozpoznaný titul tabulky a metadata.
+- **Fáze 2:** deterministické checky pro strukturu, vizuální obsah bez textového ekvivalentu, neúspěšnou extrakci, externí reference, Excel kontext a husté řádky.
+- **Fáze 3:** lokální CLI a export AI view, Markdown reportu a JSON. Krátký spouštěč z kořene projektu:
+
+  ```bash
+  ./air-dv "Data/document.docx" --report report.md
+  ```
+
+- Terminál i Markdown report obsahují status, dokument, přehled kontrol, hlavní další krok, findings s místem/důkazem/důvodem/opravou a cesty k exportům.
+- V repozitáři jsou malé anonymizované fixture soubory; reálná lokální data jsou v `Data/` a jsou ignorována Gitem.
+- Aktuální ověření: **41/41 testů prochází**.
+
+### Rozhodnutí a omezení
+
+- PDF zůstává odložený formát: vyžaduje samostatnou kalibraci OCR a layoutové nejistoty.
+- Confluence přímý přístup není součástí MVP. Pro jednotlivou stránku lze použít Confluence export do Wordu, který AIR-DV již podporuje.
+- Budoucí Confluence HTML ZIP import dává smysl až při dostupném exportu space; individuální Confluence menu běžně nabízí pouze Word/PDF.
+- Přesné lokace u Wordu/Excelu odkazují na normalizovaný AI view, ne na číslo stránky originálu.
+- `uv` v tomto headless prostředí při některých příkazech padá v macOS systémové knihovně; vytvořené `.venv` funguje a testy se spouštějí přes ni.
+
+### Doporučený další blok
+
+**Fáze 4 — lokální upload UI:** uživatel nahraje `.md`, `.docx` nebo `.xlsx`, zobrazí se mu stejný srozumitelný výsledek a AI view bez nutnosti terminálu. Po UI následuje Fáze 5: kalibrace nálezů na reálných souborech z `Data/`.
+
 ## Výsledek MVP
 
 Lokálně spustitelná webová aplikace, ve které uživatel nahraje `.md`, `.docx` nebo `.xlsx` a získá:
