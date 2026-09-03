@@ -221,6 +221,7 @@ Celkem: přibližně 8–12 pracovních dnů pro funkční demo a první kalibra
 
 ## Rizika, která je nutné hlídat během vývoje
 
+- **Testy nejsou prostředek k dosažení zeleného výsledku.** Selhaný test se nejdřív analyzuje jako možná chyba implementace. Očekávání testu se mění pouze tehdy, když se nezávisle prokáže chyba ve specifikaci, fixture nebo samotném testu; důvod změny musí být uveden v commitu či reportu bloku.
 - **Přesnost je důležitější než počet checků.** Nové pravidlo přidat jen s testy a reprezentativními příklady.
 - **Normalizovaný výstup je produktová pravda.** Nelze hodnotit originál jinak, než jaký obsah nástroj předá do AI view.
 - **Excel není jen Markdown tabulka.** Metadata workbooku/sheetů musí zůstat zachována.
