@@ -56,3 +56,10 @@ that continues on a second line.
 
         self.assertEqual([block.type for block in document.blocks], [BlockType.PARAGRAPH] * 2)
         self.assertFalse(any(block.type is BlockType.HEADING for block in document.blocks))
+
+    def test_allows_a_caller_to_label_normalized_content(self) -> None:
+        document = self.normalizer.normalize_text(
+            "converted.docx", "# Converted heading\n", source_label="Normalized Word content"
+        )
+
+        self.assertEqual(document.blocks[0].location.label, "Normalized Word content")

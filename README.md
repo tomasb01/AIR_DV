@@ -9,6 +9,8 @@ system would receive, and reports actionable content issues and ingestion limita
 
 The project requires Python 3.12 or later.
 
+Word analysis additionally requires the `docling` command to be available on `PATH`.
+
 ```bash
 PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -v
 ```
