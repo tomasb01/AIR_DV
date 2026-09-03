@@ -17,7 +17,19 @@ PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -v
 
 ## Command line
 
-Analyse a supported local document and optionally export all outputs:
+From the project directory, analyse a supported local document with the short launcher:
+
+```bash
+./air-dv "Data/document.docx"
+```
+
+It also accepts optional exports:
+
+```bash
+./air-dv "Data/document.docx" --report report.md --ai-view normalized.md --json result.json
+```
+
+The equivalent Python module command is available for automation:
 
 ```bash
 PYTHONPATH=src .venv/bin/python -m air_dv analyse path/to/document.docx \
