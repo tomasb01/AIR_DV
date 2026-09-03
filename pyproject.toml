@@ -1,0 +1,22 @@
+[project]
+name = "air-dv"
+version = "0.1.0"
+description = "AI-ready document validator"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Proprietary" }
+authors = [
+  { name = "AIR-DV team" },
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/air_dv"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
