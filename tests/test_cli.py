@@ -37,8 +37,9 @@ class CliTests(unittest.TestCase):
             serialized = json.loads(json_path.read_text(encoding="utf-8"))
 
             self.assertEqual(exit_code, 0)
-            self.assertIn("Analysed: missing_image_alt.md (md)", standard_output.getvalue())
-            self.assertIn("Image has no text equivalent", report_path.read_text(encoding="utf-8"))
+            self.assertIn("AIR-DV RESULT — NEEDS ATTENTION", standard_output.getvalue())
+            self.assertIn(f"Report: {report_path}", standard_output.getvalue())
+            self.assertIn("## Issues to fix", report_path.read_text(encoding="utf-8"))
             self.assertIn("![](architecture.png)", ai_view_path.read_text(encoding="utf-8"))
             self.assertEqual(serialized["findings"][0]["id"], "image-missing-text-equivalent")
 

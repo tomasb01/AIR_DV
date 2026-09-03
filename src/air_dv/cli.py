@@ -20,19 +20,23 @@ def main(arguments: Sequence[str] | None = None) -> int:
 
     try:
         result = analyse_file(parsed_arguments.source)
+        saved_exports = []
         if parsed_arguments.report:
             Path(parsed_arguments.report).write_text(render_markdown_report(result), encoding="utf-8")
+            saved_exports.append(f"Report: {parsed_arguments.report}")
         if parsed_arguments.ai_view:
             Path(parsed_arguments.ai_view).write_text(result.normalized_content, encoding="utf-8")
+            saved_exports.append(f"AI view: {parsed_arguments.ai_view}")
         if parsed_arguments.json_report:
             Path(parsed_arguments.json_report).write_text(
                 json.dumps(result.to_dict(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
             )
+            saved_exports.append(f"JSON: {parsed_arguments.json_report}")
     except (OSError, ValueError) as error:
         print(f"Error: {error}", file=sys.stderr)
         return 2
 
-    print(render_terminal_summary(result))
+    print(render_terminal_summary(result, saved_exports))
     return 0
 
 
