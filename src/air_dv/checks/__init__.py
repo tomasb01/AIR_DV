@@ -1,0 +1,2 @@
+"""Deterministic AI-readiness checks."""
+
