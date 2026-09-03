@@ -4,6 +4,9 @@ version = "0.1.0"
 description = "AI-ready document validator"
 readme = "README.md"
 requires-python = ">=3.12"
+dependencies = [
+  "openpyxl>=3.1,<4",
+]
 license = { text = "Proprietary" }
 authors = [
   { name = "AIR-DV team" },
@@ -19,4 +22,3 @@ packages = ["src/air_dv"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-

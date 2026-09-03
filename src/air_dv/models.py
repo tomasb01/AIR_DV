@@ -117,6 +117,7 @@ class DocumentSummary:
     file_type: str
     extraction_succeeded: bool
     extraction_notes: tuple[str, ...] = ()
+    source_metadata: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass
