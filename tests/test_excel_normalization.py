@@ -27,9 +27,10 @@ class ExcelNormalizerTests(unittest.TestCase):
             catalog.merge_cells("A1:C1")
 
             tags = workbook.create_sheet("Tags")
-            tags.append(["Tag", "Count"])
-            tags.append(["Calming", 1])
-            tags["C1"] = "=B2+1"
+            tags.append(["Tag assignments"])
+            tags.append([])
+            tags.append(["Tag", "Count", "Calculated total"])
+            tags.append(["Calming", 1, "=B4+1"])
             workbook.save(source_path)
 
             document = self.normalizer.normalize_file(source_path)
@@ -40,8 +41,10 @@ class ExcelNormalizerTests(unittest.TestCase):
         self.assertIn("## Sheet: Catalog", document.content)
         self.assertIn("### Table: Essential oils", document.content)
         self.assertIn("## Sheet: Tags", document.content)
+        self.assertIn("### Table: Tag assignments", document.content)
         self.assertIn("| ID | Name | Effect |", document.content)
-        self.assertIn("| Tag | Count | =B2+1 |", document.content)
+        self.assertIn("| Tag | Count | Calculated total |", document.content)
+        self.assertIn("| Calming | 1 | =B4+1 |", document.content)
         self.assertEqual(
             dict(document.document.source_metadata),
             {

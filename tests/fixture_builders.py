@@ -49,7 +49,8 @@ def create_context_workbook(path: Path) -> None:
     catalog.merge_cells("A1:C1")
 
     tags = workbook.create_sheet("Tags")
-    tags.append(["Tag", "Count"])
-    tags.append(["Calming", 1])
-    tags["C1"] = "=B2+1"
+    tags.append(["Tag assignments"])
+    tags.append([])
+    tags.append(["Tag", "Count", "Calculated total"])
+    tags.append(["Calming", 1, "=B4+1"])
     workbook.save(path)
