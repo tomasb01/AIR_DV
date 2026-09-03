@@ -9,7 +9,7 @@ AI-readiness risks. They are safe to commit and contain no business data.
 | `markdown/missing_image_alt.md` | Markdown | Image with no text equivalent |
 | `markdown/generic_image_alt.md` | Markdown | Image with an insufficient generic label |
 | `markdown/described_image.md` | Markdown | Image with a useful text equivalent |
-| `markdown/external_reference.md` | Markdown | Future external-reference check |
+| `markdown/external_reference.md` | Markdown | Jira reference without a local summary |
 | `word/visual_title_only.docx` | Word | Bold visual title without a semantic heading style |
 | `excel/context_workbook.xlsx` | Excel | Sheet and table context, merged title, formula |
 
