@@ -18,10 +18,12 @@ class ReportingTests(unittest.TestCase):
         self.assertIn("CHECK OVERVIEW", terminal)
         self.assertIn("Where: Source Markdown, line: 3", terminal)
         self.assertIn("Evidence: ![](architecture.png)", terminal)
+        self.assertIn("Immediately after the image at line 3", terminal)
         self.assertIn("SAVED EXPORTS", terminal)
         self.assertIn("## Overall status: NEEDS ATTENTION", report)
         self.assertIn("## Main next step", report)
         self.assertIn("### 1. Image has no text equivalent", report)
+        self.assertIn("Suggested change for this document", report)
 
     def test_renders_a_review_status_when_checks_pass(self) -> None:
         result = analyse_file(Path(__file__).parent / "fixtures" / "markdown" / "described_image.md")

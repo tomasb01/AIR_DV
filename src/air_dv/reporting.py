@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from air_dv.models import AnalysisResult, Finding, Severity, SourceLocation
+from air_dv.remediation import suggested_change
 
 
 @dataclass(frozen=True)
@@ -125,7 +126,7 @@ def render_terminal_summary(result: AnalysisResult, saved_exports: Iterable[str]
                     f"    Where: {_format_location(finding.evidence.location)}",
                     f"    Owner: {_owner_name(finding)}",
                     f"    Why: {finding.why_it_matters}",
-                    f"    Fix: {finding.recommendation}",
+                    f"    Change: {suggested_change(finding)}",
                     f"    Evidence: {_one_line_evidence(finding.evidence.excerpt)}",
                 ]
             )
@@ -158,7 +159,8 @@ def _render_markdown_finding(number: int, finding: Finding) -> list[str]:
         f"- **Owner:** {_owner_name(finding)}",
         f"- **Where:** {_format_location(finding.evidence.location)}",
         f"- **Why it matters:** {finding.why_it_matters}",
-        f"- **Suggested fix:** {finding.recommendation}",
+        f"- **Recommended approach:** {finding.recommendation}",
+        f"- **Suggested change for this document:** {suggested_change(finding)}",
         "",
         "**Evidence**",
         "```text",
@@ -195,7 +197,7 @@ def _main_next_step(result: AnalysisResult) -> str:
     finding = next(
         (item for item in result.findings if item.severity is Severity.CRITICAL), result.findings[0]
     )
-    return f"{finding.title}: {finding.recommendation}"
+    return f"{finding.title}: {suggested_change(finding)}"
 
 
 def _markdown_check_result(outcome: CheckOutcome) -> str:

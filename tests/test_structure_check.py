@@ -5,6 +5,7 @@ from dataclasses import replace
 
 from air_dv.checks.structure import StructureCheck, StructureCheckConfig
 from air_dv.normalization import MarkdownNormalizer
+from air_dv.remediation import suggested_change
 
 
 class StructureCheckTests(unittest.TestCase):
@@ -40,6 +41,7 @@ class StructureCheckTests(unittest.TestCase):
         self.assertEqual(finding.id, "section-exceeds-recommended-length")
         self.assertEqual(finding.evidence.excerpt, "Long section")
         self.assertIn("approximately 30 words", finding.why_it_matters)
+        self.assertIn("at least 2 Heading 3 subsections", suggested_change(finding))
 
     def test_does_not_report_section_length_when_extraction_failed(self) -> None:
         document = MarkdownNormalizer().normalize_text("guide.md", "# Heading\n\nText")
