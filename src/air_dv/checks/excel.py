@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
+from dataclasses import replace
 
 from air_dv.models import (
     Block,
@@ -97,7 +99,12 @@ class ExcelCheck:
 
     def _dense_row_findings(self, block: Block) -> list[Finding]:
         findings: list[Finding] = []
-        for row_number, row in enumerate(block.text.splitlines(), start=1):
+        source_row_offset = 0
+        for row in block.text.splitlines():
+            if self._is_markdown_table_separator(row):
+                continue
+            row_location = self._row_location(block.location, source_row_offset)
+            source_row_offset += 1
             if len(row) > self.config.maximum_characters_per_table_row:
                 findings.append(
                     Finding(
@@ -117,8 +124,23 @@ class ExcelCheck:
                         ),
                         evidence=Evidence(
                             excerpt=row,
-                            location=block.location,
+                            location=row_location,
                         ),
                     )
                 )
         return findings
+
+    @staticmethod
+    def _is_markdown_table_separator(row: str) -> bool:
+        return bool(re.fullmatch(r"\s*\|?(?:\s*:?-{3,}:?\s*\|)+\s*", row))
+
+    @staticmethod
+    def _row_location(location: SourceLocation, row_offset: int) -> SourceLocation:
+        if location.cell_range is None:
+            return location
+        range_match = re.fullmatch(r"([A-Z]+)(\d+):([A-Z]+)(\d+)", location.cell_range)
+        if range_match is None:
+            return location
+        start_column, start_row, end_column, _ = range_match.groups()
+        source_row = int(start_row) + row_offset
+        return replace(location, cell_range=f"{start_column}{source_row}:{end_column}{source_row}")

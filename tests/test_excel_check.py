@@ -63,8 +63,8 @@ class ExcelCheckTests(unittest.TestCase):
         self.assertEqual(findings[0].owner.value, "shared")
 
     def test_reports_only_rows_over_the_configured_density_limit(self) -> None:
-        row_at_limit = "x" * 40
-        row_over_limit = "y" * 41
+        row_at_limit = "x" * 36
+        row_over_limit = "y" * 37
         document = NormalizedDocument(
             document=DocumentSummary("dense.xlsx", "xlsx", True),
             content="",
@@ -77,8 +77,13 @@ class ExcelCheckTests(unittest.TestCase):
                 ),
                 Block(
                     type=BlockType.TABLE,
-                    text=f"{row_at_limit}\n{row_over_limit}",
-                    location=SourceLocation(label="Normalized Excel content", line_start=3, sheet_name="Data"),
+                    text=f"| {row_at_limit} |\n| --- |\n| {row_over_limit} |",
+                    location=SourceLocation(
+                        label="Normalized Excel content",
+                        line_start=3,
+                        sheet_name="Data",
+                        cell_range="A3:A4",
+                    ),
                 ),
             ),
         )
@@ -87,6 +92,7 @@ class ExcelCheckTests(unittest.TestCase):
 
         self.assertEqual([finding.id for finding in findings], ["excel-row-exceeds-recommended-density"])
         self.assertIn("41 characters", findings[0].why_it_matters)
+        self.assertEqual(findings[0].evidence.location.cell_range, "A4:A4")
 
     def test_ignores_non_excel_documents(self) -> None:
         document = NormalizedDocument(

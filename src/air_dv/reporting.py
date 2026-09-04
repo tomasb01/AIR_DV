@@ -88,9 +88,9 @@ def render_markdown_report(result: AnalysisResult) -> str:
             "",
             "## Scope of locations",
             "",
-            "Locations identify the original Markdown source where available. For Word and Excel, "
-            "they identify the normalized AI view; export it with `--ai-view` when you need to "
-            "inspect the surrounding extracted content.",
+            "Locations identify original Markdown lines, Word paragraphs, and Excel sheets/cell "
+            "ranges when AIR-DV can map the extracted block back to its source. A Word page number "
+            "is not reported because a DOCX file does not store stable pagination.",
         ]
     )
     return "\n".join(lines) + "\n"
@@ -216,8 +216,12 @@ def _terminal_check_result(outcome: CheckOutcome) -> str:
 
 def _format_location(location: SourceLocation) -> str:
     parts = [location.label]
+    if location.paragraph_index:
+        parts.append(f"paragraph: {location.paragraph_index}")
     if location.sheet_name:
         parts.append(f"sheet: {location.sheet_name}")
+    if location.cell_range:
+        parts.append(f"cells: {location.cell_range}")
     if location.line_start:
         line_range = str(location.line_start)
         if location.line_end and location.line_end != location.line_start:

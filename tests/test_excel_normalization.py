@@ -56,6 +56,7 @@ class ExcelNormalizerTests(unittest.TestCase):
         )
         tables = [block for block in document.blocks if block.type is BlockType.TABLE]
         self.assertEqual([table.location.sheet_name for table in tables], ["Catalog", "Tags"])
+        self.assertEqual([table.location.cell_range for table in tables], ["A3:C4", "A3:C4"])
 
     def test_marks_empty_sheets_in_normalized_content(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:

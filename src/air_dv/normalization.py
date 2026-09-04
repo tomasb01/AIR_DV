@@ -8,8 +8,11 @@ import subprocess
 import tempfile
 from dataclasses import replace
 from pathlib import Path
+from xml.etree import ElementTree
+from zipfile import BadZipFile, ZipFile
 
 from openpyxl import load_workbook
+from openpyxl.utils import get_column_letter
 
 from air_dv.models import Block, BlockType, DocumentSummary, NormalizedDocument, SourceLocation
 
@@ -20,6 +23,78 @@ _IMAGE_PATTERN = re.compile(r"!\[[^]]*\]\([^)]*\)")
 _OBJECT_PLACEHOLDER_PATTERN = re.compile(
     r"<!--\s*(?:image|picture|object|drawing)[^>]*-->", re.IGNORECASE
 )
+_WORD_MARKDOWN_FORMATTING_PATTERN = re.compile(r"[*_`#]")
+_WHITESPACE_PATTERN = re.compile(r"\s+")
+
+
+class WordSourceLocator:
+    """Map extracted Word blocks to stable paragraph positions in the source DOCX."""
+
+    _namespace = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+
+    def attach_locations(self, path: Path, blocks: tuple[Block, ...]) -> tuple[Block, ...]:
+        """Attach Word paragraph positions when a normalized block matches source text exactly."""
+
+        paragraphs = self._read_paragraphs(path)
+        if not paragraphs:
+            return blocks
+
+        next_paragraph = 0
+        located_blocks: list[Block] = []
+        for block in blocks:
+            source_text = self._canonical_text(block.text)
+            match_index = self._find_match(paragraphs, source_text, next_paragraph)
+            if match_index is None:
+                located_blocks.append(block)
+                continue
+            paragraph_index, _ = paragraphs[match_index]
+            located_blocks.append(
+                replace(
+                    block,
+                    location=replace(
+                        block.location,
+                        label="Word document",
+                        line_start=None,
+                        line_end=None,
+                        paragraph_index=paragraph_index,
+                    ),
+                )
+            )
+            next_paragraph = match_index + 1
+        return tuple(located_blocks)
+
+    @classmethod
+    def _read_paragraphs(cls, path: Path) -> list[tuple[int, str]]:
+        try:
+            with ZipFile(path) as archive:
+                document = ElementTree.fromstring(archive.read("word/document.xml"))
+        except (BadZipFile, ElementTree.ParseError, KeyError, OSError):
+            return []
+
+        paragraphs = []
+        for paragraph_index, paragraph in enumerate(document.findall(".//w:body/w:p", cls._namespace), start=1):
+            text = "".join(node.text or "" for node in paragraph.findall(".//w:t", cls._namespace))
+            canonical_text = cls._canonical_text(text)
+            if canonical_text:
+                paragraphs.append((paragraph_index, canonical_text))
+        return paragraphs
+
+    @staticmethod
+    def _canonical_text(text: str) -> str:
+        without_formatting = _WORD_MARKDOWN_FORMATTING_PATTERN.sub("", text)
+        return _WHITESPACE_PATTERN.sub(" ", without_formatting).strip().casefold()
+
+    @staticmethod
+    def _find_match(
+        paragraphs: list[tuple[int, str]], source_text: str, start_index: int
+    ) -> int | None:
+        if not source_text:
+            return None
+        for index in range(start_index, len(paragraphs)):
+            _, paragraph_text = paragraphs[index]
+            if source_text == paragraph_text:
+                return index
+        return None
 
 
 class MarkdownNormalizer:
@@ -229,6 +304,7 @@ class DoclingWordNormalizer:
             extracted_markdown,
             source_label="Normalized Word content",
         )
+        blocks = WordSourceLocator().attach_locations(source_path, normalized_markdown.blocks)
         return NormalizedDocument(
             document=DocumentSummary(
                 filename=source_path.name,
@@ -237,7 +313,7 @@ class DoclingWordNormalizer:
                 extraction_notes=("Extracted with Docling.",),
             ),
             content=normalized_markdown.content,
-            blocks=normalized_markdown.blocks,
+            blocks=blocks,
         )
 
     def _failed_document(self, source_path: Path, note: str) -> NormalizedDocument:
@@ -277,6 +353,7 @@ class ExcelNormalizer:
         merged_range_count = 0
         image_count = 0
         markdown_lines = [f"# Workbook: {source_path.stem}", ""]
+        table_locations: list[tuple[str, int, int, str]] = []
 
         for worksheet in workbook.worksheets:
             formula_count += sum(
@@ -287,7 +364,9 @@ class ExcelNormalizer:
             )
             merged_range_count += len(worksheet.merged_cells.ranges)
             image_count += len(worksheet._images)
-            markdown_lines.extend(self._normalize_worksheet(worksheet))
+            worksheet_lines, worksheet_table_locations = self._normalize_worksheet(worksheet)
+            markdown_lines.extend(worksheet_lines)
+            table_locations.extend(worksheet_table_locations)
 
         content = "\n".join(markdown_lines).rstrip() + "\n"
         normalized_markdown = self._markdown_normalizer.normalize_text(
@@ -309,16 +388,19 @@ class ExcelNormalizer:
                 ),
             ),
             content=content,
-            blocks=self._attach_sheet_context(normalized_markdown.blocks),
+            blocks=self._attach_sheet_context(normalized_markdown.blocks, table_locations),
         )
 
-    def _normalize_worksheet(self, worksheet: object) -> list[str]:
+    def _normalize_worksheet(
+        self, worksheet: object
+    ) -> tuple[list[str], list[tuple[str, int, int, str]]]:
         lines = [f"## Sheet: {worksheet.title}", ""]
+        table_locations: list[tuple[str, int, int, str]] = []
         row_groups = self._non_empty_row_groups(worksheet)
         pending_title: str | None = None
 
         if not row_groups:
-            return [*lines, "_No populated cells found._", ""]
+            return [*lines, "_No populated cells found._", ""], table_locations
 
         for group in row_groups:
             if self._is_title_row(group):
@@ -331,10 +413,11 @@ class ExcelNormalizer:
 
             lines.extend(self._to_markdown_table(group))
             lines.append("")
+            table_locations.append(self._table_location(worksheet.title, group))
 
         if pending_title:
             lines.extend([f"### Note: {pending_title}", ""])
-        return lines
+        return lines, table_locations
 
     @staticmethod
     def _non_empty_row_groups(worksheet: object) -> list[list[tuple[object, ...]]]:
@@ -380,8 +463,26 @@ class ExcelNormalizer:
         return f"| {' | '.join(escaped)} |"
 
     @staticmethod
-    def _attach_sheet_context(blocks: tuple[Block, ...]) -> tuple[Block, ...]:
+    def _table_location(
+        sheet_name: str, rows: list[tuple[object, ...]]
+    ) -> tuple[str, int, int, str]:
+        populated_cells = [cell for row in rows for cell in row if cell.value not in (None, "")]
+        row_start = min(cell.row for cell in populated_cells)
+        row_end = max(cell.row for cell in populated_cells)
+        column_start = min(cell.column for cell in populated_cells)
+        column_end = max(cell.column for cell in populated_cells)
+        cell_range = (
+            f"{get_column_letter(column_start)}{row_start}:"
+            f"{get_column_letter(column_end)}{row_end}"
+        )
+        return sheet_name, row_start, row_end, cell_range
+
+    @staticmethod
+    def _attach_sheet_context(
+        blocks: tuple[Block, ...], table_locations: list[tuple[str, int, int, str]]
+    ) -> tuple[Block, ...]:
         current_sheet: str | None = None
+        table_index = 0
         contextualized_blocks: list[Block] = []
 
         for block in blocks:
@@ -390,9 +491,18 @@ class ExcelNormalizer:
                 if block.text.startswith(sheet_prefix):
                     current_sheet = block.text.removeprefix(sheet_prefix)
 
-            contextualized_blocks.append(
-                replace(block, location=replace(block.location, sheet_name=current_sheet))
-            )
+            location = replace(block.location, sheet_name=current_sheet)
+            if block.type is BlockType.TABLE and table_index < len(table_locations):
+                sheet_name, _, _, cell_range = table_locations[table_index]
+                location = replace(
+                    location,
+                    sheet_name=sheet_name,
+                    line_start=None,
+                    line_end=None,
+                    cell_range=cell_range,
+                )
+                table_index += 1
+            contextualized_blocks.append(replace(block, location=location))
 
         return tuple(contextualized_blocks)
 
