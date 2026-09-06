@@ -51,6 +51,7 @@ class SourceLocation:
     sheet_name: str | None = None
     cell_range: str | None = None
     paragraph_index: int | None = None
+    page_number: int | None = None
 
     def __post_init__(self) -> None:
         if self.line_start is not None and self.line_start < 1:
@@ -59,6 +60,8 @@ class SourceLocation:
             raise ValueError("line_end must be greater than zero")
         if self.paragraph_index is not None and self.paragraph_index < 1:
             raise ValueError("paragraph_index must be greater than zero")
+        if self.page_number is not None and self.page_number < 1:
+            raise ValueError("page_number must be greater than zero")
         if (
             self.line_start is not None
             and self.line_end is not None

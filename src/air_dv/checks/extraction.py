@@ -31,13 +31,18 @@ class ExtractionCheck:
             return [self._extraction_failed_finding(document)]
 
         findings: list[Finding] = []
+        unsupported_objects = [
+            block for block in document.blocks if block.type is BlockType.UNSUPPORTED_OBJECT
+        ]
         for block in document.blocks:
             if block.type is BlockType.IMAGE:
                 finding = self._image_finding(block)
                 if finding is not None:
                     findings.append(finding)
-            elif block.type is BlockType.UNSUPPORTED_OBJECT:
-                findings.append(self._unsupported_object_finding(block))
+        if document.document.file_type == "pdf" and unsupported_objects:
+            findings.append(self._pdf_visual_objects_finding(unsupported_objects))
+        else:
+            findings.extend(self._unsupported_object_finding(block) for block in unsupported_objects)
 
         return findings
 
@@ -125,4 +130,25 @@ class ExtractionCheck:
                 "semantic representation."
             ),
             evidence=Evidence(excerpt=block.text, location=block.location),
+        )
+
+    @staticmethod
+    def _pdf_visual_objects_finding(blocks: list[Block]) -> Finding:
+        first_block = blocks[0]
+        return Finding(
+            id="pdf-visual-objects-could-not-be-verified",
+            title="PDF contains visual objects without verified text equivalents",
+            severity=Severity.WARNING,
+            category=FindingCategory.INGESTION_LIMITATION,
+            owner=FindingOwner.SHARED,
+            why_it_matters=(
+                f"Docling retained {len(blocks)} visual-object placeholder(s) rather than their "
+                "semantic content. AIR-DV cannot determine whether they contain information that "
+                "a text-only AI system would miss."
+            ),
+            recommendation=(
+                "Review the listed PDF visuals. Add nearby text descriptions for visuals that "
+                "carry decisions, values, process steps, or exceptions; then re-run AIR-DV."
+            ),
+            evidence=Evidence(excerpt=first_block.text, location=first_block.location),
         )

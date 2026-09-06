@@ -45,14 +45,14 @@ class CliTests(unittest.TestCase):
 
     def test_analyse_returns_a_clear_error_for_an_unsupported_file(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
-            source_path = Path(temporary_directory, "unsupported.pdf")
+            source_path = Path(temporary_directory, "unsupported.txt")
             source_path.write_text("Not a supported source.", encoding="utf-8")
             standard_error = io.StringIO()
             with redirect_stderr(standard_error):
                 exit_code = main(["analyse", str(source_path)])
 
         self.assertEqual(exit_code, 2)
-        self.assertIn("Unsupported source format '.pdf'", standard_error.getvalue())
+        self.assertIn("Unsupported source format '.txt'", standard_error.getvalue())
 
     def test_analyse_returns_a_clear_error_for_a_missing_source(self) -> None:
         standard_error = io.StringIO()

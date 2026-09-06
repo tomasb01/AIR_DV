@@ -67,6 +67,17 @@ def suggested_change(finding: Finding) -> str:
             "No content edit is recommended until extraction succeeds. Open the source file, check "
             "the extractor requirement, then re-run AIR-DV."
         )
+    if finding.id == "pdf-ocr-quality-could-not-be-verified":
+        return (
+            "Compare the normalized AI view with the original PDF, especially visual regions. "
+            "Do not rely on the extracted text alone until the OCR warnings are resolved or "
+            "accepted after review."
+        )
+    if finding.id == "pdf-visual-objects-could-not-be-verified":
+        return (
+            f"Starting at {location}, review each visual placeholder. Add a text description next "
+            "to every visual that carries a decision, value, process step, or exception."
+        )
     if finding.id == "object-text-equivalent-could-not-be-verified":
         return (
             f"At {location}, add a nearby text description of the object's purpose and key "
@@ -81,6 +92,8 @@ def _location_reference(finding: Finding) -> str:
         return f"sheet “{location.sheet_name}”, cells {location.cell_range}"
     if location.paragraph_index:
         return f"Word paragraph {location.paragraph_index}"
+    if location.page_number:
+        return f"PDF page {location.page_number}"
     if location.line_start:
         return f"line {location.line_start}"
     return location.label

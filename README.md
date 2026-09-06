@@ -2,14 +2,14 @@
 
 AIR-DV is a local-first tool that checks whether a document is ready for general AI use.
 
-The MVP accepts Markdown, Word, and Excel files, shows the normalized content that an AI
+The MVP accepts Markdown, Word, PDF, and Excel files, shows the normalized content that an AI
 system would receive, and reports actionable content issues and ingestion limitations.
 
 ## Development
 
 The project requires Python 3.12 or later.
 
-Word analysis additionally requires the `docling` command to be available on `PATH`.
+Word and PDF analysis additionally require the `docling` command to be available on `PATH`.
 
 ```bash
 PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -v
@@ -36,8 +36,10 @@ PYTHONPATH=src .venv/bin/python -m air_dv analyse path/to/document.docx \
   --report report.md --ai-view normalized.md --json result.json
 ```
 
-The command supports `.md`, `.docx`, and `.xlsx`. Word analysis requires the local
-`docling` command; all analysis and exports remain on the local machine.
+The command supports `.md`, `.docx`, `.pdf`, and `.xlsx`. Word and PDF analysis require the
+local `docling` command; all analysis and exports remain on the local machine. PDF conversion
+uses image placeholders rather than embedded image data and reports OCR warnings and visual
+objects whose text equivalent cannot be verified.
 
 ## Product documents
 

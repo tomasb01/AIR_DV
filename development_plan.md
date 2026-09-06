@@ -6,15 +6,15 @@ Navazuje na [product_spec.md](product_spec.md). Cílem je ukázat během krátk�
 
 Produktový jazyk je **angličtina**. Anglicky budou všechny prvky, které mohou vidět uživatelé či budoucí integrace: UI, findings, doporučení, reporty, exportovaný AI view, CLI výstup a chybové zprávy. Stejně tak zdrojový kód používá anglické názvy a případné komentáře v angličtině. Lokalizace není součástí MVP.
 
-## Aktuální stav vývoje — 3. září 2026
+## Aktuální stav vývoje — 4. září 2026
 
-Poslední publikovaný commit: `d092f8d` na větvi `main`.
+Poslední publikovaný commit před aktuálním PDF blokem: `bd16a13` na větvi `main`.
 
 ### Dokončeno
 
 - **Fáze 0:** projektová kostra, serializovatelný datový kontrakt findings a testy.
-- **Fáze 1:** normalizace Markdownu, Wordu přes Docling a Excelu přes `openpyxl`; Excel zachovává workbook, sheet, rozpoznaný titul tabulky a metadata.
-- **Fáze 2:** deterministické checky pro strukturu, vizuální obsah bez textového ekvivalentu, neúspěšnou extrakci, externí reference, Excel kontext a husté řádky.
+- **Fáze 1:** normalizace Markdownu, Wordu a PDF přes Docling a Excelu přes `openpyxl`; Excel zachovává workbook, sheet, rozpoznaný titul tabulky a metadata. PDF používá obrazové placeholdery, nikdy inline Base64 data.
+- **Fáze 2:** deterministické checky pro strukturu, vizuální obsah bez textového ekvivalentu, neúspěšnou extrakci, PDF OCR varování, externí reference, Excel kontext a husté řádky.
 - **Fáze 3:** lokální CLI a export AI view, Markdown reportu a JSON. Krátký spouštěč z kořene projektu:
 
   ```bash
@@ -23,11 +23,12 @@ Poslední publikovaný commit: `d092f8d` na větvi `main`.
 
 - Terminál i Markdown report obsahují status, dokument, přehled kontrol, hlavní další krok, findings s místem/důkazem/důvodem/opravou a cesty k exportům.
 - V repozitáři jsou malé anonymizované fixture soubory; reálná lokální data jsou v `Data/` a jsou ignorována Gitem.
-- Aktuální ověření: **41/41 testů prochází**.
+- Zdrojové lokace uvádějí řádky Markdownu, odstavce Wordu, stránky PDF a sheet/cell range Excelu, pokud je lze bezpečně namapovat.
+- Aktuální ověření: **47/47 testů prochází**; integrační běh na 17stránkovém PDF vrací dva agregované warnings (37 vizuálních placeholderů a 6 OCR varování), nikoli desítky duplicitních findings.
 
 ### Rozhodnutí a omezení
 
-- PDF zůstává odložený formát: vyžaduje samostatnou kalibraci OCR a layoutové nejistoty.
+- PDF je podporovaný formát, ale OCR a vizuální layout zůstávají explicitní nejistotou: warning neznamená, že je text chybně přečtený, ale že je nutné porovnat AI view s originálními stranami.
 - Confluence přímý přístup není součástí MVP. Pro jednotlivou stránku lze použít Confluence export do Wordu, který AIR-DV již podporuje.
 - Budoucí Confluence HTML ZIP import dává smysl až při dostupném exportu space; individuální Confluence menu běžně nabízí pouze Word/PDF.
 - Přesné lokace u Wordu/Excelu odkazují na normalizovaný AI view, ne na číslo stránky originálu.
@@ -35,18 +36,18 @@ Poslední publikovaný commit: `d092f8d` na větvi `main`.
 
 ### Doporučený další blok
 
-**Fáze 4 — lokální upload UI:** uživatel nahraje `.md`, `.docx` nebo `.xlsx`, zobrazí se mu stejný srozumitelný výsledek a AI view bez nutnosti terminálu. Po UI následuje Fáze 5: kalibrace nálezů na reálných souborech z `Data/`.
+**Fáze 4 — lokální upload UI:** uživatel nahraje `.md`, `.docx`, `.pdf` nebo `.xlsx`, zobrazí se mu stejný srozumitelný výsledek a AI view bez nutnosti terminálu. Po UI následuje Fáze 5: kalibrace nálezů na reálných souborech z `Data/`.
 
 ## Výsledek MVP
 
-Lokálně spustitelná webová aplikace, ve které uživatel nahraje `.md`, `.docx` nebo `.xlsx` a získá:
+Lokálně spustitelná webová aplikace, ve které uživatel nahraje `.md`, `.docx`, `.pdf` nebo `.xlsx` a získá:
 
 1. normalizovaný AI vstup;
 2. prioritizované findings s důkazem v obsahu;
 3. u každého findingu severity, vlastníka opravy a doporučení;
 4. jasné rozlišení mezi problémem obsahu a omezením ingestu.
 
-PDF patří až do druhé iterace MVP, protože vyžaduje samostatnou kalibraci OCR a layoutu.
+PDF je součástí MVP s transparentním označením OCR a vizuálních omezení.
 
 ## Doporučená technická volba
 

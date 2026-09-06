@@ -20,11 +20,11 @@ class CheckOutcome:
 
 
 _CHECKS = (
-    ("Extraction", {"document-extraction-failed"}, {"md", "docx", "xlsx"}),
+    ("Extraction", {"document-extraction-failed"}, {"md", "docx", "pdf", "xlsx"}),
     (
         "Document structure",
         {"missing-semantic-headings", "section-exceeds-recommended-length"},
-        {"md", "docx"},
+        {"md", "docx", "pdf"},
     ),
     (
         "Visual text alternatives",
@@ -32,10 +32,12 @@ _CHECKS = (
             "image-missing-text-equivalent",
             "image-text-equivalent-may-be-insufficient",
             "object-text-equivalent-could-not-be-verified",
+            "pdf-visual-objects-could-not-be-verified",
         },
-        {"md", "docx"},
+        {"md", "docx", "pdf"},
     ),
-    ("External references", {"external-reference-without-local-summary"}, {"md", "docx"}),
+    ("PDF extraction quality", {"pdf-ocr-quality-could-not-be-verified"}, {"pdf"}),
+    ("External references", {"external-reference-without-local-summary"}, {"md", "docx", "pdf"}),
     (
         "Excel table context",
         {
@@ -89,9 +91,9 @@ def render_markdown_report(result: AnalysisResult) -> str:
             "",
             "## Scope of locations",
             "",
-            "Locations identify original Markdown lines, Word paragraphs, and Excel sheets/cell "
-            "ranges when AIR-DV can map the extracted block back to its source. A Word page number "
-            "is not reported because a DOCX file does not store stable pagination.",
+            "Locations identify original Markdown lines, Word paragraphs, PDF pages, and Excel "
+            "sheets/cell ranges when AIR-DV can map the extracted block back to its source. A Word "
+            "page number is not reported because a DOCX file does not store stable pagination.",
         ]
     )
     return "\n".join(lines) + "\n"
@@ -220,6 +222,8 @@ def _format_location(location: SourceLocation) -> str:
     parts = [location.label]
     if location.paragraph_index:
         parts.append(f"paragraph: {location.paragraph_index}")
+    if location.page_number:
+        parts.append(f"page: {location.page_number}")
     if location.sheet_name:
         parts.append(f"sheet: {location.sheet_name}")
     if location.cell_range:
@@ -244,7 +248,7 @@ def _one_line_evidence(excerpt: str) -> str:
 
 
 def _format_name(file_type: str) -> str:
-    return {"md": "Markdown (.md)", "docx": "Word (.docx)", "xlsx": "Excel (.xlsx)"}.get(
+    return {"md": "Markdown (.md)", "docx": "Word (.docx)", "pdf": "PDF (.pdf)", "xlsx": "Excel (.xlsx)"}.get(
         file_type, file_type
     )
 

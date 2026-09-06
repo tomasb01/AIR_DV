@@ -7,9 +7,10 @@ from pathlib import Path
 from air_dv.checks.excel import ExcelCheck
 from air_dv.checks.external_references import ExternalReferenceCheck
 from air_dv.checks.extraction import ExtractionCheck
+from air_dv.checks.pdf_quality import PdfExtractionQualityCheck
 from air_dv.checks.structure import StructureCheck
 from air_dv.models import AnalysisResult, NormalizedDocument
-from air_dv.normalization import DoclingWordNormalizer, ExcelNormalizer, MarkdownNormalizer
+from air_dv.normalization import DoclingPdfNormalizer, DoclingWordNormalizer, ExcelNormalizer, MarkdownNormalizer
 
 
 class UnsupportedSourceFormatError(ValueError):
@@ -25,7 +26,13 @@ def analyse_file(path: str | Path) -> AnalysisResult:
 
     document = _normalizer_for(source_path).normalize_file(source_path)
     findings = []
-    for check in (StructureCheck(), ExtractionCheck(), ExternalReferenceCheck(), ExcelCheck()):
+    for check in (
+        StructureCheck(),
+        ExtractionCheck(),
+        PdfExtractionQualityCheck(),
+        ExternalReferenceCheck(),
+        ExcelCheck(),
+    ):
         findings.extend(check.run(document))
     return AnalysisResult(
         document=document.document,
@@ -34,15 +41,19 @@ def analyse_file(path: str | Path) -> AnalysisResult:
     )
 
 
-def _normalizer_for(path: Path) -> MarkdownNormalizer | DoclingWordNormalizer | ExcelNormalizer:
+def _normalizer_for(
+    path: Path,
+) -> MarkdownNormalizer | DoclingWordNormalizer | DoclingPdfNormalizer | ExcelNormalizer:
     suffix = path.suffix.casefold()
     if suffix == ".md":
         return MarkdownNormalizer()
     if suffix == ".docx":
         return DoclingWordNormalizer()
+    if suffix == ".pdf":
+        return DoclingPdfNormalizer()
     if suffix == ".xlsx":
         return ExcelNormalizer()
     raise UnsupportedSourceFormatError(
         f"Unsupported source format '{suffix or 'without an extension'}'. "
-        "Supported formats: .md, .docx, .xlsx."
+        "Supported formats: .md, .docx, .pdf, .xlsx."
     )

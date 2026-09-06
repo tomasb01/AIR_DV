@@ -13,6 +13,7 @@ from zipfile import BadZipFile, ZipFile
 
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
+from pypdf import PdfReader
 
 from air_dv.models import Block, BlockType, DocumentSummary, NormalizedDocument, SourceLocation
 
@@ -94,6 +95,55 @@ class WordSourceLocator:
             _, paragraph_text = paragraphs[index]
             if source_text == paragraph_text:
                 return index
+        return None
+
+
+class PdfSourceLocator:
+    """Map extracted PDF blocks to source pages when extractable page text is available."""
+
+    def attach_locations(self, path: Path, blocks: tuple[Block, ...]) -> tuple[Block, ...]:
+        """Attach the best available source page to each normalized block."""
+
+        page_texts = self._read_page_texts(path)
+        if not page_texts:
+            return blocks
+
+        current_page = 1
+        located_blocks: list[Block] = []
+        for block in blocks:
+            source_text = WordSourceLocator._canonical_text(block.text)
+            matched_page = self._find_page(page_texts, source_text, current_page)
+            if matched_page is not None:
+                current_page = matched_page
+            located_blocks.append(
+                replace(
+                    block,
+                    location=replace(
+                        block.location,
+                        label="PDF document",
+                        line_start=None,
+                        line_end=None,
+                        page_number=current_page,
+                    ),
+                )
+            )
+        return tuple(located_blocks)
+
+    @staticmethod
+    def _read_page_texts(path: Path) -> list[str]:
+        try:
+            reader = PdfReader(path)
+            return [WordSourceLocator._canonical_text(page.extract_text() or "") for page in reader.pages]
+        except Exception:
+            return []
+
+    @staticmethod
+    def _find_page(page_texts: list[str], source_text: str, start_page: int) -> int | None:
+        if not source_text:
+            return None
+        for page_number in range(start_page, len(page_texts) + 1):
+            if source_text in page_texts[page_number - 1]:
+                return page_number
         return None
 
 
@@ -315,6 +365,92 @@ class DoclingWordNormalizer:
             content=normalized_markdown.content,
             blocks=blocks,
         )
+
+    def _failed_document(self, source_path: Path, note: str) -> NormalizedDocument:
+        return NormalizedDocument(
+            document=DocumentSummary(
+                filename=source_path.name,
+                file_type=self.file_type,
+                extraction_succeeded=False,
+                extraction_notes=(note,),
+            ),
+            content="",
+            blocks=(),
+        )
+
+
+class DoclingPdfNormalizer:
+    """Normalize PDF documents through Docling without embedding image payloads."""
+
+    file_type = "pdf"
+
+    def __init__(self, executable: str = "docling") -> None:
+        self.executable = executable
+        self._markdown_normalizer = MarkdownNormalizer()
+
+    def normalize_file(self, path: str | Path) -> NormalizedDocument:
+        """Extract a PDF to Markdown and retain source-page context where possible."""
+
+        source_path = Path(path)
+        if source_path.suffix.lower() != ".pdf":
+            raise ValueError("DoclingPdfNormalizer only accepts .pdf files")
+        if shutil.which(self.executable) is None:
+            return self._failed_document(
+                source_path, f"Required extractor '{self.executable}' is not available on PATH."
+            )
+
+        with tempfile.TemporaryDirectory(prefix="air-dv-docling-") as output_dir:
+            command = [
+                self.executable,
+                "convert",
+                str(source_path),
+                "--to",
+                "md",
+                "--output",
+                output_dir,
+                "--image-export-mode",
+                "placeholder",
+            ]
+            completed = subprocess.run(command, capture_output=True, text=True, check=False)
+            output_path = Path(output_dir, f"{source_path.stem}.md")
+            if completed.returncode != 0:
+                detail = completed.stderr.strip() or completed.stdout.strip() or "Unknown extractor error."
+                return self._failed_document(source_path, f"Docling extraction failed: {detail}")
+            if not output_path.is_file():
+                return self._failed_document(
+                    source_path, "Docling completed without producing a Markdown output file."
+                )
+            extracted_markdown = output_path.read_text(encoding="utf-8")
+
+        normalized_markdown = self._markdown_normalizer.normalize_text(
+            source_path.name, extracted_markdown, source_label="Normalized PDF content"
+        )
+        ocr_warning_count = (completed.stdout + completed.stderr).count("RapidOCR returned empty result")
+        notes = ["Extracted with Docling using image placeholders."]
+        if ocr_warning_count:
+            notes.append(f"Docling reported {ocr_warning_count} OCR warning(s).")
+        return NormalizedDocument(
+            document=DocumentSummary(
+                filename=source_path.name,
+                file_type=self.file_type,
+                extraction_succeeded=True,
+                extraction_notes=tuple(notes),
+                source_metadata=(
+                    ("page_count", str(self._page_count(source_path))),
+                    ("visual_placeholder_count", str(extracted_markdown.count("<!--"))),
+                    ("ocr_warning_count", str(ocr_warning_count)),
+                ),
+            ),
+            content=normalized_markdown.content,
+            blocks=PdfSourceLocator().attach_locations(source_path, normalized_markdown.blocks),
+        )
+
+    @staticmethod
+    def _page_count(path: Path) -> int:
+        try:
+            return len(PdfReader(path).pages)
+        except Exception:
+            return 0
 
     def _failed_document(self, source_path: Path, note: str) -> NormalizedDocument:
         return NormalizedDocument(
