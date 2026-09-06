@@ -1,6 +1,6 @@
 # AI-ready dokumenty — product specification (MVP demo)
 
-**Stav:** návrh před vývojem  
+**Stav:** implementované CLI jádro; následuje lokální upload UI
 **Cíl verze:** krátké, srozumitelné demo nad jednotlivým nahraným souborem.  
 **Není cílem MVP:** adopce přes Confluence/CI ani simulace konkrétní RAG pipeline.
 
@@ -25,7 +25,7 @@ Podporované vstupy v MVP:
 - Markdown (`.md`)
 - Word (`.docx`)
 - Excel (`.xlsx`)
-- PDF, pokud je jeho extrakce spolehlivá; skeny a složité layouty se označí jako omezeně analyzovatelné
+- PDF (`.pdf`); OCR, vizuální objekty a složité layouty se transparentně označí jako omezeně ověřené
 
 Primární výstup není procentuální známka. Je to seznam konkrétních, akčních nálezů s vlastníkem opravy.
 
@@ -45,7 +45,7 @@ Word / Excel / Markdown / PDF
   report + náhled „co AI uvidí"
 ```
 
-Normalizace není pouhá konverze do Markdownu. Musí doplnit bezpečně dostupný kontext, který by lineární export mohl ztratit.
+Normalizace není pouhá konverze do Markdownu. Musí doplnit bezpečně dostupný kontext, který by lineární export mohl ztratit. U PDF se obrázky exportují jako placeholdery, nikoli jako vložené Base64 payloady; report pak výslovně uvede, zda jejich textový ekvivalent nelze ověřit.
 
 Příklad Excelu:
 
@@ -97,6 +97,7 @@ MVP začne konzervativně: jen checky s vysokou přesností.
 - metadata zdroje existují, ale ztratila se v normalizovaném výstupu (zejména název Excel sheetu)
 - titul/popisek tabulky ztratil vazbu na samotnou tabulku
 - extrahovaná tabulka je příliš široká nebo obsahuje velmi dlouhé řádky, které se obtížně zachovají jako celek
+- PDF extractor ohlásil OCR varování nebo ponechal vizuální objekt bez ověřitelného textového ekvivalentu
 
 ### Mimo MVP
 
@@ -155,6 +156,8 @@ Uživatel má vidět:
 - označení míst, která nebyla spolehlivě extrahována;
 - vazbu z nálezu na konkrétní blok obsahu.
 
+Místo nálezu musí odpovídat zdrojovému formátu: řádek pro Markdown, odstavec pro Word, stránka pro PDF a sheet/cell range pro Excel — vždy jen tehdy, když lze vazbu bezpečně doložit.
+
 Originál se nikdy automaticky nemění. Budoucí verze může nabídnout návrh opravy ke zkopírování nebo potvrzení člověkem.
 
 ## 9. Příklady ověřené na testovacích souborech
@@ -166,6 +169,10 @@ Docling z dokumentu spolehlivě vytáhl text. Významné kapitoly však byly ve 
 ### Excel: katalog tagů
 
 Workbook má čtyři pojmenované sheety a zjevné titulky tabulek. Běžný Markdown export zachoval data, ale nezachoval názvy sheetů a jejich vztah k tabulkám. Jde primárně o ingestion limitation: normalizační vrstva má názvy sheetů doplnit automaticky. Pokud účel tabulky nelze spolehlivě určit, jde o shared issue.
+
+### PDF: výstupní zpráva
+
+PDF se analyzuje přes Docling s placeholdery vizuálů. Pokud extraktor vrátí OCR varování nebo placeholdery pro obrázky, AIR-DV vytváří souhrnný warning a odkazuje na první dostupnou stránku; neprohlašuje tím automaticky, že je obsah chybný, ale vyžaduje porovnání AI view s originálem.
 
 ## 10. Budoucí rozšíření
 

@@ -6,9 +6,9 @@ Navazuje na [product_spec.md](product_spec.md). Cílem je ukázat během krátk�
 
 Produktový jazyk je **angličtina**. Anglicky budou všechny prvky, které mohou vidět uživatelé či budoucí integrace: UI, findings, doporučení, reporty, exportovaný AI view, CLI výstup a chybové zprávy. Stejně tak zdrojový kód používá anglické názvy a případné komentáře v angličtině. Lokalizace není součástí MVP.
 
-## Aktuální stav vývoje — 4. září 2026
+## Aktuální stav vývoje — 6. září 2026
 
-Poslední publikovaný commit před aktuálním PDF blokem: `bd16a13` na větvi `main`.
+Poslední publikovaný commit: `761b048` na větvi `main`.
 
 ### Dokončeno
 
@@ -31,12 +31,19 @@ Poslední publikovaný commit před aktuálním PDF blokem: `bd16a13` na větvi 
 - PDF je podporovaný formát, ale OCR a vizuální layout zůstávají explicitní nejistotou: warning neznamená, že je text chybně přečtený, ale že je nutné porovnat AI view s originálními stranami.
 - Confluence přímý přístup není součástí MVP. Pro jednotlivou stránku lze použít Confluence export do Wordu, který AIR-DV již podporuje.
 - Budoucí Confluence HTML ZIP import dává smysl až při dostupném exportu space; individuální Confluence menu běžně nabízí pouze Word/PDF.
-- Přesné lokace u Wordu/Excelu odkazují na normalizovaný AI view, ne na číslo stránky originálu.
+- Word findings odkazují na původní odstavec, Excel findings na původní sheet a cell range a PDF findings na původní stránku, pokud lze extrahovaný blok bezpečně mapovat. Markdown findings odkazují na řádek souboru.
 - `uv` v tomto headless prostředí při některých příkazech padá v macOS systémové knihovně; vytvořené `.venv` funguje a testy se spouštějí přes ni.
 
 ### Doporučený další blok
 
 **Fáze 4 — lokální upload UI:** uživatel nahraje `.md`, `.docx`, `.pdf` nebo `.xlsx`, zobrazí se mu stejný srozumitelný výsledek a AI view bez nutnosti terminálu. Po UI následuje Fáze 5: kalibrace nálezů na reálných souborech z `Data/`.
+
+### Handoff pro příští restart
+
+- Začít **Fází 4, blok 4A**: minimální lokální webové UI pro upload a výsledek; použít existující `analyse_file()` a renderovací vrstvu, nepřepisovat logiku normalizace ani checků.
+- Podporované uploady: `.md`, `.docx`, `.pdf`, `.xlsx`. Soubory a exporty jsou pouze dočasné a lokální.
+- První ověření UI: jeden anonymizovaný fixture pro každý formát; jako dodatečný lokální integrační vzorek lze použít soubory v `Data/`, které nesmějí do Gitu.
+- Po 4A se zastavit, ověřit upload a report v prohlížeči a teprve poté rozhodnout o zobrazení AI view / filtrování findings v dalším UI bloku.
 
 ## Výsledek MVP
 
@@ -110,7 +117,14 @@ analyse(file) → AnalysisResult
 - zachovat dostupné odkazy, obrázky a tabulky;
 - pokud extractor narazí na nejistě zpracovaný objekt, vytvořit explicitní marker místo tichého vynechání.
 
-### 1C. Excel
+### 1C. PDF
+
+- extrahovat přes Docling s `--image-export-mode placeholder`, nikdy ne s embedded Base64 obrázky;
+- zachovat číslo stránky, pokud jej lze bezpečně přiřadit ke zdrojovému bloku;
+- evidovat OCR varování a počet neověřených vizuálních objektů;
+- agregovat opakované vizuální placeholdery do jednoho srozumitelného findingu.
+
+### 1D. Excel
 
 - načíst názvy workbooku a všech sheetů přes `openpyxl`;
 - z Doclingu získat text/tabulky;
@@ -127,7 +141,7 @@ analyse(file) → AnalysisResult
 
 ### Hotovo, když
 
-- analyzovaný Word, Markdown a Excel vrátí `AnalysisResult`;
+- analyzovaný Word, Markdown, PDF a Excel vrátí `AnalysisResult`;
 - výsledný normalizovaný obsah je zobrazenelný jako Markdown/text;
 - export Excelu nikdy neztratí název workbooku ani sheetu;
 - analýza neskončí chybou jen proto, že soubor obsahuje nepodporovaný objekt: místo toho vrátí marker či finding.
@@ -157,6 +171,10 @@ Implementovat v tomto pořadí:
    - ingestion limitation, `platform_team`, pokud přidaná metadata chybí v exportu;
    - shared, pokud tabulka nemá zjistitelný název/účel;
    - warning pro řádky výrazně přesahující dohodnutý limit znaků/tokenů.
+6. **PDF: OCR nebo vizuální objekt nelze ověřit**
+   - warning, `platform_team` nebo `shared` podle povahy nejistoty;
+   - PDF nesmí být označeno jako bezrizikové jen proto, že převod technicky doběhl;
+   - opakované placeholdery se reportují souhrnně, s odkazem na první dostupnou stránku.
 
 Každé pravidlo vrací jeden či více `Finding` objektů. Pravidlo nemá stanovovat finální celkové skóre.
 
@@ -186,7 +204,7 @@ CLI vypíše stručné shrnutí do terminálu a umí uložit:
 
 ### Hotovo, když
 
-- oba dodané referenční soubory (Word kniha a Excel katalog) projdou CLI;
+- referenční Word, Excel a PDF projdou CLI;
 - report pro Word upozorní na nedostatek semantických nadpisů;
 - report pro Excel obsahuje kontext workbooku/sheetů a neoznačí platformní ztrátu jako chybu autora.
 
@@ -219,7 +237,7 @@ CLI vypíše stručné shrnutí do terminálu a umí uložit:
 ### Hotovo, když
 
 - demo lze spustit jedním příkazem;
-- uživatel nahraje Word nebo Excel, prohlédne findings a AI view;
+- uživatel nahraje Markdown, Word, PDF nebo Excel, prohlédne findings a AI view;
 - výsledek je použitelný bez znalosti Doclingu, chunkingu nebo RAG.
 
 ## Fáze 5 — kalibrace s reálným vzorkem
@@ -228,7 +246,7 @@ CLI vypíše stručné shrnutí do terminálu a umí uložit:
 
 ### Práce
 
-- vybrat 20–30 reálných artefaktů: Word, Markdown, Excel a později PDF;
+- vybrat 20–30 reálných artefaktů: Word, Markdown, Excel a PDF;
 - ručně vytvořit očekávané findings podle product spec;
 - změřit precision každého checku a popsat nejasné případy;
 - upravit thresholdy a formulace;
