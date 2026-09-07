@@ -6,9 +6,9 @@ Navazuje na [product_spec.md](product_spec.md). Cílem je ukázat během krátk�
 
 Produktový jazyk je **angličtina**. Anglicky budou všechny prvky, které mohou vidět uživatelé či budoucí integrace: UI, findings, doporučení, reporty, exportovaný AI view, CLI výstup a chybové zprávy. Stejně tak zdrojový kód používá anglické názvy a případné komentáře v angličtině. Lokalizace není součástí MVP.
 
-## Aktuální stav vývoje — 6. září 2026
+## Aktuální stav vývoje — 7. září 2026
 
-Poslední publikovaný commit: `761b048` na větvi `main`.
+Poslední publikovaný commit před aktuálním UI blokem: `3d19b76` na větvi `main`.
 
 ### Dokončeno
 
@@ -25,6 +25,7 @@ Poslední publikovaný commit: `761b048` na větvi `main`.
 - V repozitáři jsou malé anonymizované fixture soubory; reálná lokální data jsou v `Data/` a jsou ignorována Gitem.
 - Zdrojové lokace uvádějí řádky Markdownu, odstavce Wordu, stránky PDF a sheet/cell range Excelu, pokud je lze bezpečně namapovat.
 - Aktuální ověření: **47/47 testů prochází**; integrační běh na 17stránkovém PDF vrací dva agregované warnings (37 vizuálních placeholderů a 6 OCR varování), nikoli desítky duplicitních findings.
+- **Fáze 4A:** základní lokální upload UI přes FastAPI. Přijímá `.md`, `.docx`, `.pdf`, `.xlsx`, volá existující `analyse_file()` a zobrazí status, přehled kontrol i akční findings. Upload je omezen na 50 MB a po analýze se smaže z dočasného adresáře. Ověření: **50/50 testů**, včetně HTTP uploadu přes lokální server.
 
 ### Rozhodnutí a omezení
 
@@ -36,14 +37,14 @@ Poslední publikovaný commit: `761b048` na větvi `main`.
 
 ### Doporučený další blok
 
-**Fáze 4 — lokální upload UI:** uživatel nahraje `.md`, `.docx`, `.pdf` nebo `.xlsx`, zobrazí se mu stejný srozumitelný výsledek a AI view bez nutnosti terminálu. Po UI následuje Fáze 5: kalibrace nálezů na reálných souborech z `Data/`.
+**Fáze 4B — rozšíření výsledku UI:** nad existujícím uploadem zobrazit AI view a nabídnout stažení Markdown reportu / AI view / JSON. Až po ověření této části následuje Fáze 5: kalibrace nálezů na reálných souborech z `Data/`.
 
 ### Handoff pro příští restart
 
-- Začít **Fází 4, blok 4A**: minimální lokální webové UI pro upload a výsledek; použít existující `analyse_file()` a renderovací vrstvu, nepřepisovat logiku normalizace ani checků.
-- Podporované uploady: `.md`, `.docx`, `.pdf`, `.xlsx`. Soubory a exporty jsou pouze dočasné a lokální.
-- První ověření UI: jeden anonymizovaný fixture pro každý formát; jako dodatečný lokální integrační vzorek lze použít soubory v `Data/`, které nesmějí do Gitu.
-- Po 4A se zastavit, ověřit upload a report v prohlížeči a teprve poté rozhodnout o zobrazení AI view / filtrování findings v dalším UI bloku.
+- Začít **Fází 4, blok 4B**: rozšířit existující `air_dv.web` o AI view a exporty z již vytvořeného `AnalysisResult`; nepřepisovat logiku normalizace ani checků.
+- Podporované uploady zůstávají `.md`, `.docx`, `.pdf`, `.xlsx`. Soubory i odvozené exporty musí zůstat dočasné a lokální.
+- Ověřit UI s jedním anonymizovaným fixture pro každý formát; jako dodatečný lokální integrační vzorek lze použít soubory v `Data/`, které nesmějí do Gitu.
+- Po 4B se zastavit, ověřit AI view a stažení v prohlížeči a teprve poté rozhodnout o filtrech findings nebo kalibraci.
 
 ## Výsledek MVP
 

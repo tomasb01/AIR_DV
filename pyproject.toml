@@ -5,8 +5,11 @@ description = "AI-ready document validator"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+  "fastapi>=0.115,<1",
   "openpyxl>=3.1,<4",
   "pypdf>=5,<7",
+  "python-multipart>=0.0.20,<1",
+  "uvicorn>=0.30,<1",
 ]
 license = { text = "Proprietary" }
 authors = [
@@ -15,6 +18,12 @@ authors = [
 
 [project.scripts]
 air-dv = "air_dv.cli:main"
+air-dv-ui = "air_dv.web:main"
+
+[dependency-groups]
+dev = [
+  "httpx2>=2.12,<3",
+]
 
 [build-system]
 requires = ["hatchling"]

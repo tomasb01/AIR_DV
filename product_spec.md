@@ -1,6 +1,6 @@
 # AI-ready dokumenty — product specification (MVP demo)
 
-**Stav:** implementované CLI jádro; následuje lokální upload UI
+**Stav:** implementované CLI jádro a základní lokální upload UI; následuje AI view a exporty v UI
 **Cíl verze:** krátké, srozumitelné demo nad jednotlivým nahraným souborem.  
 **Není cílem MVP:** adopce přes Confluence/CI ani simulace konkrétní RAG pipeline.
 
@@ -110,6 +110,8 @@ MVP začne konzervativně: jen checky s vysokou přesností.
 ## 7. Uživatelské rozhraní pro demo
 
 MVP má malé upload UI. Upload není cílový model adopce; je to nejrychlejší způsob, jak ukázat hodnotu a ověřit důvěru ve findings.
+
+První implementovaný blok UI umožňuje nahrát podporovaný soubor a zobrazí status, přehled kontrol a findings. Upload je pouze lokální, má limit 50 MB a po analýze se smaže. Náhled AI view, exporty a filtry jsou následující UI blok.
 
 ### Hlavní tok
 

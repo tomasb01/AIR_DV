@@ -1,0 +1,7 @@
+#!/bin/sh
+# Run AIR-DV's local upload UI from a repository checkout.
+
+project_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+PYTHONPATH="$project_root/src${PYTHONPATH:+:$PYTHONPATH}"
+export PYTHONPATH
+exec "$project_root/.venv/bin/python" -m air_dv.web

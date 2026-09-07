@@ -41,6 +41,17 @@ local `docling` command; all analysis and exports remain on the local machine. P
 uses image placeholders rather than embedded image data and reports OCR warnings and visual
 objects whose text equivalent cannot be verified.
 
+## Local UI
+
+Start the local upload UI from the project directory:
+
+```bash
+./air-dv-ui
+```
+
+Then open `http://127.0.0.1:8000` in a browser. Uploaded files are kept only in a temporary
+local directory for the duration of the analysis and are then deleted.
+
 ## Product documents
 
 - [Product specification](product_spec.md)
