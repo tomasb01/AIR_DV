@@ -42,7 +42,8 @@ class PdfExtractionQualityCheckTests(unittest.TestCase):
         findings = ExtractionCheck().run(self.document)
 
         self.assertEqual(
-            [finding.id for finding in findings], ["pdf-visual-objects-could-not-be-verified"]
+            [finding.id for finding in findings],
+            ["pdf-visual-objects-unavailable-to-text-only-ingestion"],
         )
         self.assertIn("3 visual-object placeholder", findings[0].why_it_matters)
         self.assertEqual(findings[0].evidence.location.page_number, 4)

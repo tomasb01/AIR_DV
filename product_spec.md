@@ -45,7 +45,7 @@ Word / Excel / Markdown / PDF
   report + náhled „co AI uvidí"
 ```
 
-Normalizace není pouhá konverze do Markdownu. Musí doplnit bezpečně dostupný kontext, který by lineární export mohl ztratit. U PDF se obrázky exportují jako placeholdery, nikoli jako vložené Base64 payloady; report pak výslovně uvede, zda jejich textový ekvivalent nelze ověřit.
+Normalizace není pouhá konverze do Markdownu. Musí doplnit bezpečně dostupný kontext, který by lineární export mohl ztratit. Aktuální AI view je **text-only**: obrázky se nepředávají modelu jako pixely. Word a PDF vizuály se proto exportují jako placeholdery, nikoli jako vložené Base64 payloady, a report výslovně upozorní, že textový LLM jejich obsah neuvidí. Oprava je buď lokální textový ekvivalent, nebo budoucí multimodální ingest, který obrazová data zachová a předá cílovému modelu.
 
 Příklad Excelu:
 

@@ -26,6 +26,7 @@ Poslední publikovaný commit před aktuálním UI blokem: `3d19b76` na větvi `
 - Zdrojové lokace uvádějí řádky Markdownu, odstavce Wordu, stránky PDF a sheet/cell range Excelu, pokud je lze bezpečně namapovat.
 - Aktuální ověření: **47/47 testů prochází**; integrační běh na 17stránkovém PDF vrací dva agregované warnings (37 vizuálních placeholderů a 6 OCR varování), nikoli desítky duplicitních findings.
 - **Fáze 4A:** základní lokální upload UI přes FastAPI. Přijímá `.md`, `.docx`, `.pdf`, `.xlsx`, volá existující `analyse_file()` a zobrazí status, přehled kontrol i akční findings. Upload je omezen na 50 MB a po analýze se smaže z dočasného adresáře. Ověření: **50/50 testů**, včetně HTTP uploadu přes lokální server.
+- **Kalibrace vizuálů:** Word a PDF placeholdery se agregují do jednoho findingu. AIR-DV je nyní explicitně text-only: report rozlišuje počet vizuálních referencí a unikátních Word médií a doporučí buď textový ekvivalent, nebo multimodální ingest. Reálný Word s 1 040 referencemi / 434 unikátními médii vrací jeden warning místo 1 040 položek.
 
 ### Rozhodnutí a omezení
 
@@ -43,6 +44,7 @@ Poslední publikovaný commit před aktuálním UI blokem: `3d19b76` na větvi `
 
 - Začít **Fází 4, blok 4B**: rozšířit existující `air_dv.web` o AI view a exporty z již vytvořeného `AnalysisResult`; nepřepisovat logiku normalizace ani checků.
 - Podporované uploady zůstávají `.md`, `.docx`, `.pdf`, `.xlsx`. Soubory i odvozené exporty musí zůstat dočasné a lokální.
+- Současný profil AI view je text-only. UI musí tuto skutečnost zachovat viditelnou; multimodální ingest je budoucí explicitně konfigurovatelný profil, nikoli tichý předpoklad.
 - Ověřit UI s jedním anonymizovaným fixture pro každý formát; jako dodatečný lokální integrační vzorek lze použít soubory v `Data/`, které nesmějí do Gitu.
 - Po 4B se zastavit, ověřit AI view a stažení v prohlížeči a teprve poté rozhodnout o filtrech findings nebo kalibraci.
 

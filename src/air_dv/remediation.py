@@ -73,10 +73,18 @@ def suggested_change(finding: Finding) -> str:
             "Do not rely on the extracted text alone until the OCR warnings are resolved or "
             "accepted after review."
         )
-    if finding.id == "pdf-visual-objects-could-not-be-verified":
+    if finding.id == "pdf-visual-objects-unavailable-to-text-only-ingestion":
         return (
             f"Starting at {location}, review each visual placeholder. Add a text description next "
-            "to every visual that carries a decision, value, process step, or exception."
+            "to every visual that carries a decision, value, process step, or exception; or use a "
+            "multimodal ingestion pipeline that supplies the images to the target model."
+        )
+    if finding.id == "word-visual-objects-unavailable-to-text-only-ingestion":
+        return (
+            f"Starting at {location}, review representative visuals rather than treating every "
+            "reference as a separate task. Add text descriptions beside visuals that carry decisions, "
+            "values, process steps, or exceptions; or use a multimodal ingestion pipeline that "
+            "supplies the images to the target model."
         )
     if finding.id == "object-text-equivalent-could-not-be-verified":
         return (

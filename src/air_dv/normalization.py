@@ -32,6 +32,7 @@ class WordSourceLocator:
     """Map extracted Word blocks to stable paragraph positions in the source DOCX."""
 
     _namespace = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+    _drawing_namespace = "http://schemas.openxmlformats.org/drawingml/2006/main"
 
     def attach_locations(self, path: Path, blocks: tuple[Block, ...]) -> tuple[Block, ...]:
         """Attach Word paragraph positions when a normalized block matches source text exactly."""
@@ -64,6 +65,47 @@ class WordSourceLocator:
             next_paragraph = match_index + 1
         return tuple(located_blocks)
 
+    def attach_visual_locations(self, path: Path, blocks: tuple[Block, ...]) -> tuple[Block, ...]:
+        """Attach original Word paragraph locations to visual-object placeholders."""
+
+        visual_paragraphs = self._read_visual_paragraphs(path)
+        visual_index = 0
+        located_blocks: list[Block] = []
+        for block in blocks:
+            if block.type is not BlockType.UNSUPPORTED_OBJECT or visual_index >= len(visual_paragraphs):
+                located_blocks.append(block)
+                continue
+            paragraph_index = visual_paragraphs[visual_index]
+            visual_index += 1
+            located_blocks.append(
+                replace(
+                    block,
+                    location=replace(
+                        block.location,
+                        label="Word document",
+                        line_start=None,
+                        line_end=None,
+                        paragraph_index=paragraph_index,
+                    ),
+                )
+            )
+        return tuple(located_blocks)
+
+    @classmethod
+    def visual_metadata(cls, path: Path) -> tuple[tuple[str, str], ...]:
+        """Return source-level visual-reference counts without extracting image content."""
+
+        try:
+            with ZipFile(path) as archive:
+                document_xml = archive.read("word/document.xml")
+                media_count = sum(name.startswith("word/media/") for name in archive.namelist())
+        except (BadZipFile, KeyError, OSError):
+            return (("visual_reference_count", "0"), ("unique_media_file_count", "0"))
+        return (
+            ("visual_reference_count", str(document_xml.count(b"<a:blip"))),
+            ("unique_media_file_count", str(media_count)),
+        )
+
     @classmethod
     def _read_paragraphs(cls, path: Path) -> list[tuple[int, str]]:
         try:
@@ -78,6 +120,20 @@ class WordSourceLocator:
             canonical_text = cls._canonical_text(text)
             if canonical_text:
                 paragraphs.append((paragraph_index, canonical_text))
+        return paragraphs
+
+    @classmethod
+    def _read_visual_paragraphs(cls, path: Path) -> list[int]:
+        try:
+            with ZipFile(path) as archive:
+                document = ElementTree.fromstring(archive.read("word/document.xml"))
+        except (BadZipFile, ElementTree.ParseError, KeyError, OSError):
+            return []
+
+        paragraphs = []
+        for paragraph_index, paragraph in enumerate(document.findall(".//w:body/w:p", cls._namespace), start=1):
+            visual_count = len(paragraph.findall(f".//{{{cls._drawing_namespace}}}blip"))
+            paragraphs.extend([paragraph_index] * visual_count)
         return paragraphs
 
     @staticmethod
@@ -354,13 +410,16 @@ class DoclingWordNormalizer:
             extracted_markdown,
             source_label="Normalized Word content",
         )
-        blocks = WordSourceLocator().attach_locations(source_path, normalized_markdown.blocks)
+        source_locator = WordSourceLocator()
+        blocks = source_locator.attach_locations(source_path, normalized_markdown.blocks)
+        blocks = source_locator.attach_visual_locations(source_path, blocks)
         return NormalizedDocument(
             document=DocumentSummary(
                 filename=source_path.name,
                 file_type=self.file_type,
                 extraction_succeeded=True,
                 extraction_notes=("Extracted with Docling.",),
+                source_metadata=source_locator.visual_metadata(source_path),
             ),
             content=normalized_markdown.content,
             blocks=blocks,

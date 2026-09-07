@@ -41,6 +41,8 @@ class ExtractionCheck:
                     findings.append(finding)
         if document.document.file_type == "pdf" and unsupported_objects:
             findings.append(self._pdf_visual_objects_finding(unsupported_objects))
+        elif document.document.file_type == "docx" and unsupported_objects:
+            findings.append(self._word_visual_objects_finding(document, unsupported_objects))
         else:
             findings.extend(self._unsupported_object_finding(block) for block in unsupported_objects)
 
@@ -136,19 +138,51 @@ class ExtractionCheck:
     def _pdf_visual_objects_finding(blocks: list[Block]) -> Finding:
         first_block = blocks[0]
         return Finding(
-            id="pdf-visual-objects-could-not-be-verified",
-            title="PDF contains visual objects without verified text equivalents",
+            id="pdf-visual-objects-unavailable-to-text-only-ingestion",
+            title="Text-only ingestion cannot process PDF visual objects",
             severity=Severity.WARNING,
             category=FindingCategory.INGESTION_LIMITATION,
             owner=FindingOwner.SHARED,
             why_it_matters=(
-                f"Docling retained {len(blocks)} visual-object placeholder(s) rather than their "
-                "semantic content. AIR-DV cannot determine whether they contain information that "
-                "a text-only AI system would miss."
+                f"AIR-DV's current AI view is text-only and retains {len(blocks)} visual-object "
+                "placeholder(s), not image pixels or their semantic content. A text-only LLM will "
+                "not receive information contained only in these PDF visuals."
             ),
             recommendation=(
-                "Review the listed PDF visuals. Add nearby text descriptions for visuals that "
-                "carry decisions, values, process steps, or exceptions; then re-run AIR-DV."
+                "For visuals that carry decisions, values, process steps, or exceptions, add a "
+                "nearby text equivalent. Alternatively, configure a multimodal ingestion pipeline "
+                "that retains and supplies the source images to the target model."
+            ),
+            evidence=Evidence(excerpt=first_block.text, location=first_block.location),
+        )
+
+    @staticmethod
+    def _word_visual_objects_finding(
+        document: NormalizedDocument, blocks: list[Block]
+    ) -> Finding:
+        first_block = blocks[0]
+        metadata = dict(document.document.source_metadata)
+        reference_count = metadata.get("visual_reference_count", str(len(blocks)))
+        media_count = metadata.get("unique_media_file_count")
+        unique_media_detail = f" ({media_count} unique media file(s))" if media_count else ""
+        return Finding(
+            id="word-visual-objects-unavailable-to-text-only-ingestion",
+            title="Text-only ingestion cannot process Word visual objects",
+            severity=Severity.WARNING,
+            category=FindingCategory.INGESTION_LIMITATION,
+            owner=FindingOwner.SHARED,
+            why_it_matters=(
+                f"AIR-DV's current AI view is text-only and retains {len(blocks)} visual-object "
+                f"placeholder(s), not image pixels or their semantic content. The Word source "
+                f"contains {reference_count} visual reference(s){unique_media_detail}; repeated "
+                "references do not necessarily mean separate images. A text-only LLM will not "
+                "receive information contained only in these visuals."
+            ),
+            recommendation=(
+                "Review representative visuals, especially diagrams, tables rendered as images, "
+                "and screenshots. Add nearby text equivalents where they carry decisions, values, "
+                "process steps, or exceptions. Alternatively, configure a multimodal ingestion "
+                "pipeline that retains and supplies the source images to the target model."
             ),
             evidence=Evidence(excerpt=first_block.text, location=first_block.location),
         )

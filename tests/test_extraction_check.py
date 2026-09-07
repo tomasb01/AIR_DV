@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 from air_dv.checks.extraction import ExtractionCheck
-from air_dv.models import DocumentSummary, NormalizedDocument
+from air_dv.models import Block, BlockType, DocumentSummary, NormalizedDocument, SourceLocation
 from air_dv.normalization import MarkdownNormalizer
 
 
@@ -64,3 +64,39 @@ class ExtractionCheckTests(unittest.TestCase):
         self.assertEqual([finding.id for finding in findings], ["document-extraction-failed"])
         self.assertEqual(findings[0].severity.value, "critical")
         self.assertEqual(findings[0].owner.value, "platform_team")
+
+    def test_aggregates_word_visual_placeholders_with_source_metadata(self) -> None:
+        document = NormalizedDocument(
+            document=DocumentSummary(
+                filename="illustrated.docx",
+                file_type="docx",
+                extraction_succeeded=True,
+                source_metadata=(
+                    ("visual_reference_count", "8"),
+                    ("unique_media_file_count", "3"),
+                ),
+            ),
+            content="<!-- image -->\n<!-- image -->",
+            blocks=(
+                Block(
+                    type=BlockType.UNSUPPORTED_OBJECT,
+                    text="<!-- image -->",
+                    location=SourceLocation(label="Word document", paragraph_index=12),
+                ),
+                Block(
+                    type=BlockType.UNSUPPORTED_OBJECT,
+                    text="<!-- image -->",
+                    location=SourceLocation(label="Word document", paragraph_index=13),
+                ),
+            ),
+        )
+
+        findings = self.check.run(document)
+
+        self.assertEqual(
+            [finding.id for finding in findings],
+            ["word-visual-objects-unavailable-to-text-only-ingestion"],
+        )
+        self.assertIn("8 visual reference(s) (3 unique media file(s))", findings[0].why_it_matters)
+        self.assertIn("multimodal ingestion pipeline", findings[0].recommendation)
+        self.assertEqual(findings[0].evidence.location.paragraph_index, 12)

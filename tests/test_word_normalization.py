@@ -5,8 +5,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from air_dv.models import BlockType
-from air_dv.normalization import DoclingWordNormalizer
+from air_dv.models import Block, BlockType, SourceLocation
+from air_dv.normalization import DoclingWordNormalizer, WordSourceLocator
 
 
 class DoclingWordNormalizerTests(unittest.TestCase):
@@ -46,3 +46,24 @@ class DoclingWordNormalizerTests(unittest.TestCase):
     def test_rejects_non_word_files(self) -> None:
         with self.assertRaisesRegex(ValueError, "only accepts .docx"):
             DoclingWordNormalizer().normalize_file("guide.md")
+
+    def test_maps_visual_placeholders_to_source_paragraphs(self) -> None:
+        blocks = (
+            Block(
+                type=BlockType.UNSUPPORTED_OBJECT,
+                text="<!-- image -->",
+                location=SourceLocation(label="Normalized Word content", line_start=3),
+            ),
+            Block(
+                type=BlockType.UNSUPPORTED_OBJECT,
+                text="<!-- image -->",
+                location=SourceLocation(label="Normalized Word content", line_start=5),
+            ),
+        )
+        with patch.object(WordSourceLocator, "_read_visual_paragraphs", return_value=[7, 12]):
+            located_blocks = WordSourceLocator().attach_visual_locations(Path("guide.docx"), blocks)
+
+        self.assertEqual(
+            [block.location.paragraph_index for block in located_blocks], [7, 12]
+        )
+        self.assertTrue(all(block.location.label == "Word document" for block in located_blocks))
