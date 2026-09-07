@@ -2,13 +2,7 @@
 
 from __future__ import annotations
 
-import math
-import re
-
 from air_dv.models import Finding
-
-
-_WORD_COUNT_PATTERN = re.compile(r"approximately (\d+) words")
 
 
 def suggested_change(finding: Finding) -> str:
@@ -16,13 +10,11 @@ def suggested_change(finding: Finding) -> str:
 
     location = _location_reference(finding)
     if finding.id == "section-exceeds-recommended-length":
-        word_count_match = _WORD_COUNT_PATTERN.search(finding.why_it_matters)
-        word_count = int(word_count_match.group(1)) if word_count_match else 0
-        subsection_count = max(2, math.ceil(word_count / 800))
         return (
-            f"Keep “{finding.evidence.excerpt}” as the section title. Split the content after "
-            f"this title into at least {subsection_count} Heading 3 subsections, each covering one "
-            "distinct topic. Add each heading immediately before the paragraph where that topic begins."
+            f"Review the content after “{finding.evidence.excerpt}” and add a semantic heading at "
+            "each actual topic boundary. Use Heading 2 for a new major topic and Heading 3 only "
+            "for a subtopic that belongs under the current section. Do not nest unrelated topics "
+            "under this title."
         )
     if finding.id == "missing-semantic-headings":
         return (
