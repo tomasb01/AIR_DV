@@ -6,8 +6,19 @@ import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
 
 from air_dv.cli import main
+from air_dv.models import (
+    AnalysisResult,
+    DocumentSummary,
+    Evidence,
+    Finding,
+    FindingCategory,
+    FindingOwner,
+    Severity,
+    SourceLocation,
+)
 
 
 class CliTests(unittest.TestCase):
@@ -61,3 +72,35 @@ class CliTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 2)
         self.assertIn("Source file does not exist", standard_error.getvalue())
+
+    def test_returns_two_when_extraction_fails(self) -> None:
+        result = AnalysisResult(
+            document=DocumentSummary("unreadable.pdf", "pdf", extraction_succeeded=False),
+            normalized_content="",
+        )
+        with patch("air_dv.cli.analyse_file", return_value=result):
+            exit_code = main(["analyse", "unreadable.pdf"])
+
+        self.assertEqual(exit_code, 2)
+
+    def test_fail_on_severity_returns_one_for_matching_finding(self) -> None:
+        result = AnalysisResult(
+            document=DocumentSummary("warning.md", "md", extraction_succeeded=True),
+            normalized_content="Content",
+            findings=[
+                Finding(
+                    id="test-warning",
+                    title="Test warning",
+                    severity=Severity.WARNING,
+                    category=FindingCategory.CONTENT_ISSUE,
+                    owner=FindingOwner.CONTENT_OWNER,
+                    why_it_matters="Test.",
+                    recommendation="Fix it.",
+                    evidence=Evidence("Test", SourceLocation(label="Test")),
+                )
+            ],
+        )
+        with patch("air_dv.cli.analyse_file", return_value=result):
+            exit_code = main(["analyse", "warning.md", "--fail-on-severity", "warning"])
+
+        self.assertEqual(exit_code, 1)

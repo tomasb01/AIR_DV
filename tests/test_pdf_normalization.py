@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+import subprocess
 
 from air_dv.models import BlockType
 from air_dv.normalization import DoclingPdfNormalizer
@@ -60,7 +61,23 @@ class DoclingPdfNormalizerTests(unittest.TestCase):
             [BlockType.HEADING, BlockType.PARAGRAPH, BlockType.UNSUPPORTED_OBJECT, BlockType.HEADING],
         )
         self.assertTrue(all(block.location.label == "PDF document" for block in document.blocks))
-        self.assertEqual([block.location.page_number for block in document.blocks], [1, 1, 1, 2])
+        self.assertEqual([block.location.page_number for block in document.blocks], [1, 1, None, 2])
+
+    def test_returns_explicit_failure_when_docling_times_out(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            source_path = Path(temporary_directory, "report.pdf")
+            source_path.touch()
+            with (
+                patch("air_dv.normalization.shutil.which", return_value="/usr/local/bin/docling"),
+                patch(
+                    "air_dv.normalization.subprocess.run",
+                    side_effect=subprocess.TimeoutExpired("docling", 3),
+                ),
+            ):
+                document = DoclingPdfNormalizer(timeout_seconds=3).normalize_file(source_path)
+
+        self.assertFalse(document.document.extraction_succeeded)
+        self.assertIn("3-second timeout", document.document.extraction_notes[0])
 
     def test_returns_explicit_failure_when_docling_is_unavailable(self) -> None:
         with patch("air_dv.normalization.shutil.which", return_value=None):

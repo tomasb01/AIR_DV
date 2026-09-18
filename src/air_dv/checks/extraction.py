@@ -30,6 +30,9 @@ class ExtractionCheck:
         if not document.document.extraction_succeeded:
             return [self._extraction_failed_finding(document)]
 
+        if not document.content.strip():
+            return [self._empty_content_finding(document)]
+
         findings: list[Finding] = []
         unsupported_objects = [
             block for block in document.blocks if block.type is BlockType.UNSUPPORTED_OBJECT
@@ -47,6 +50,28 @@ class ExtractionCheck:
             findings.extend(self._unsupported_object_finding(block) for block in unsupported_objects)
 
         return findings
+
+    @staticmethod
+    def _empty_content_finding(document: NormalizedDocument) -> Finding:
+        return Finding(
+            id="document-content-is-empty",
+            title="Document has no extractable content",
+            severity=Severity.CRITICAL,
+            category=FindingCategory.INGESTION_LIMITATION,
+            owner=FindingOwner.SHARED,
+            why_it_matters=(
+                "AIR-DV received no text or structured content to assess. A blank source or an "
+                "empty extractor output cannot provide reliable input to an AI system."
+            ),
+            recommendation=(
+                "Confirm that the source contains the intended content. If it does, check the "
+                "extractor output and configuration before relying on this document as AI input."
+            ),
+            evidence=Evidence(
+                excerpt="No normalized content was produced.",
+                location=SourceLocation(label="Extraction status"),
+            ),
+        )
 
     @staticmethod
     def _extraction_failed_finding(document: NormalizedDocument) -> Finding:

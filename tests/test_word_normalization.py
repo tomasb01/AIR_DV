@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+import subprocess
 
 from air_dv.models import Block, BlockType, SourceLocation
 from air_dv.normalization import DoclingWordNormalizer, WordSourceLocator
@@ -42,6 +43,23 @@ class DoclingWordNormalizerTests(unittest.TestCase):
         self.assertFalse(document.document.extraction_succeeded)
         self.assertEqual(document.content, "")
         self.assertIn("not available", document.document.extraction_notes[0])
+
+    def test_sets_a_timeout_for_docling(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            source_path = Path(temporary_directory, "guide.docx")
+            source_path.touch()
+            with (
+                patch("air_dv.normalization.shutil.which", return_value="/usr/local/bin/docling"),
+                patch(
+                    "air_dv.normalization.subprocess.run",
+                    side_effect=subprocess.TimeoutExpired("docling", 7),
+                ) as run,
+            ):
+                document = DoclingWordNormalizer(timeout_seconds=7).normalize_file(source_path)
+
+        self.assertFalse(document.document.extraction_succeeded)
+        self.assertEqual(run.call_args.kwargs["timeout"], 7)
+        self.assertIn("7-second timeout", document.document.extraction_notes[0])
 
     def test_rejects_non_word_files(self) -> None:
         with self.assertRaisesRegex(ValueError, "only accepts .docx"):

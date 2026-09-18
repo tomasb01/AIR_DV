@@ -4,7 +4,8 @@ import unittest
 from pathlib import Path
 
 from air_dv.analysis import analyse_file
-from air_dv.reporting import render_markdown_report, render_terminal_summary
+from air_dv.models import AnalysisResult, DocumentSummary
+from air_dv.reporting import check_outcomes, render_markdown_report, render_terminal_summary
 
 
 class ReportingTests(unittest.TestCase):
@@ -32,3 +33,21 @@ class ReportingTests(unittest.TestCase):
 
         self.assertIn("AIR-DV RESULT — READY FOR REVIEW", terminal)
         self.assertIn("No deterministic AI-readiness issues were identified.", terminal)
+
+    def test_marks_content_checks_as_skipped_after_extraction_failure(self) -> None:
+        result = AnalysisResult(
+            document=DocumentSummary(
+                filename="unreadable.docx",
+                file_type="docx",
+                extraction_succeeded=False,
+            ),
+            normalized_content="",
+            findings=[],
+        )
+
+        outcomes = {outcome.name: outcome.status for outcome in check_outcomes(result)}
+
+        self.assertEqual(outcomes["Extraction"], "Needs attention")
+        self.assertEqual(outcomes["Document structure"], "Skipped")
+        self.assertEqual(outcomes["Visual text alternatives"], "Skipped")
+        self.assertEqual(outcomes["External references"], "Skipped")

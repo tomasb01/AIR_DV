@@ -65,6 +65,15 @@ class ExtractionCheckTests(unittest.TestCase):
         self.assertEqual(findings[0].severity.value, "critical")
         self.assertEqual(findings[0].owner.value, "platform_team")
 
+    def test_reports_empty_normalized_content_as_critical(self) -> None:
+        document = self.normalizer.normalize_text("empty.md", "\n \n")
+
+        findings = self.check.run(document)
+
+        self.assertEqual([finding.id for finding in findings], ["document-content-is-empty"])
+        self.assertEqual(findings[0].severity.value, "critical")
+        self.assertEqual(findings[0].owner.value, "shared")
+
     def test_aggregates_word_visual_placeholders_with_source_metadata(self) -> None:
         document = NormalizedDocument(
             document=DocumentSummary(

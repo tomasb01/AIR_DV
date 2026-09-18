@@ -20,7 +20,11 @@ class CheckOutcome:
 
 
 _CHECKS = (
-    ("Extraction", {"document-extraction-failed"}, {"md", "docx", "pdf", "xlsx"}),
+    (
+        "Extraction",
+        {"document-extraction-failed", "document-content-is-empty"},
+        {"md", "docx", "pdf", "xlsx"},
+    ),
     (
         "Document structure",
         {"missing-semantic-headings", "section-exceeds-recommended-length"},
@@ -150,7 +154,14 @@ def check_outcomes(result: AnalysisResult) -> list[CheckOutcome]:
             outcomes.append(CheckOutcome(name, "Not assessed"))
             continue
         count = sum(finding_id in related_ids for finding_id in finding_ids)
-        outcomes.append(CheckOutcome(name, "Passed" if count == 0 else "Needs attention", count))
+        if name == "Extraction" and not result.document.extraction_succeeded:
+            outcomes.append(CheckOutcome(name, "Needs attention", count))
+        elif count:
+            outcomes.append(CheckOutcome(name, "Needs attention", count))
+        elif not result.document.extraction_succeeded and name != "Extraction":
+            outcomes.append(CheckOutcome(name, "Skipped"))
+        else:
+            outcomes.append(CheckOutcome(name, "Passed"))
     return outcomes
 
 
@@ -210,7 +221,9 @@ def _markdown_check_result(outcome: CheckOutcome) -> str:
 
 
 def _terminal_marker(outcome: CheckOutcome) -> str:
-    return {"Passed": "✓", "Needs attention": "!", "Not assessed": "–"}[outcome.status]
+    return {"Passed": "✓", "Needs attention": "!", "Skipped": "–", "Not assessed": "–"}[
+        outcome.status
+    ]
 
 
 def _terminal_check_result(outcome: CheckOutcome) -> str:

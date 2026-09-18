@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Sequence
 
 from air_dv.analysis import analyse_file
+from air_dv.models import Severity
 from air_dv.reporting import render_markdown_report, render_terminal_summary
 
 
@@ -37,15 +38,35 @@ def main(arguments: Sequence[str] | None = None) -> int:
         return 2
 
     print(render_terminal_summary(result, saved_exports))
+    if not result.document.extraction_succeeded:
+        return 2
+    if parsed_arguments.fail_on_severity and _has_finding_at_or_above(
+        result.findings, Severity(parsed_arguments.fail_on_severity)
+    ):
+        return 1
     return 0
 
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Check whether a document is ready for general AI use.")
     commands = parser.add_subparsers(dest="command", required=True)
-    analyse_parser = commands.add_parser("analyse", help="Analyse a Markdown, Word, or Excel document.")
-    analyse_parser.add_argument("source", help="Path to a .md, .docx, or .xlsx file.")
+    analyse_parser = commands.add_parser("analyse", help="Analyse a supported local document.")
+    analyse_parser.add_argument("source", help="Path to a .md, .docx, .pdf, or .xlsx file.")
     analyse_parser.add_argument("--report", help="Write a Markdown findings report to this path.")
     analyse_parser.add_argument("--ai-view", help="Write normalized AI-view content to this path.")
     analyse_parser.add_argument("--json", dest="json_report", help="Write the full JSON result to this path.")
+    analyse_parser.add_argument(
+        "--fail-on-severity",
+        choices=[severity.value for severity in Severity],
+        help="Return exit code 1 when a finding meets or exceeds this severity.",
+    )
     return parser
+
+
+def _has_finding_at_or_above(findings: list, threshold: Severity) -> bool:
+    ranks = {Severity.INFO: 1, Severity.WARNING: 2, Severity.CRITICAL: 3}
+    return any(ranks[finding.severity] >= ranks[threshold] for finding in findings)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

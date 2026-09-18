@@ -26,6 +26,7 @@ _OBJECT_PLACEHOLDER_PATTERN = re.compile(
 )
 _WORD_MARKDOWN_FORMATTING_PATTERN = re.compile(r"[*_`#]")
 _WHITESPACE_PATTERN = re.compile(r"\s+")
+_DEFAULT_DOCLING_TIMEOUT_SECONDS = 120
 
 
 class WordSourceLocator:
@@ -164,11 +165,11 @@ class PdfSourceLocator:
         if not page_texts:
             return blocks
 
-        current_page = 1
+        current_page: int | None = None
         located_blocks: list[Block] = []
         for block in blocks:
             source_text = WordSourceLocator._canonical_text(block.text)
-            matched_page = self._find_page(page_texts, source_text, current_page)
+            matched_page = self._find_page(page_texts, source_text, current_page or 1)
             if matched_page is not None:
                 current_page = matched_page
             located_blocks.append(
@@ -179,7 +180,7 @@ class PdfSourceLocator:
                         label="PDF document",
                         line_start=None,
                         line_end=None,
-                        page_number=current_page,
+                        page_number=matched_page,
                     ),
                 )
             )
@@ -362,8 +363,11 @@ class DoclingWordNormalizer:
 
     file_type = "docx"
 
-    def __init__(self, executable: str = "docling") -> None:
+    def __init__(
+        self, executable: str = "docling", timeout_seconds: int = _DEFAULT_DOCLING_TIMEOUT_SECONDS
+    ) -> None:
         self.executable = executable
+        self.timeout_seconds = timeout_seconds
         self._markdown_normalizer = MarkdownNormalizer()
 
     def normalize_file(self, path: str | Path) -> NormalizedDocument:
@@ -376,7 +380,7 @@ class DoclingWordNormalizer:
         if shutil.which(self.executable) is None:
             return self._failed_document(
                 source_path,
-                f"Required extractor '{self.executable}' is not available on PATH.",
+                f"Required extractor '{self.executable}' is not available.",
             )
 
         with tempfile.TemporaryDirectory(prefix="air-dv-docling-") as output_dir:
@@ -391,7 +395,19 @@ class DoclingWordNormalizer:
                 "--image-export-mode",
                 "placeholder",
             ]
-            completed = subprocess.run(command, capture_output=True, text=True, check=False)
+            try:
+                completed = subprocess.run(
+                    command,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    timeout=self.timeout_seconds,
+                )
+            except subprocess.TimeoutExpired:
+                return self._failed_document(
+                    source_path,
+                    f"Docling extraction exceeded the {self.timeout_seconds}-second timeout.",
+                )
             output_path = Path(output_dir, f"{source_path.stem}.md")
 
             if completed.returncode != 0:
@@ -443,8 +459,11 @@ class DoclingPdfNormalizer:
 
     file_type = "pdf"
 
-    def __init__(self, executable: str = "docling") -> None:
+    def __init__(
+        self, executable: str = "docling", timeout_seconds: int = _DEFAULT_DOCLING_TIMEOUT_SECONDS
+    ) -> None:
         self.executable = executable
+        self.timeout_seconds = timeout_seconds
         self._markdown_normalizer = MarkdownNormalizer()
 
     def normalize_file(self, path: str | Path) -> NormalizedDocument:
@@ -455,7 +474,7 @@ class DoclingPdfNormalizer:
             raise ValueError("DoclingPdfNormalizer only accepts .pdf files")
         if shutil.which(self.executable) is None:
             return self._failed_document(
-                source_path, f"Required extractor '{self.executable}' is not available on PATH."
+                source_path, f"Required extractor '{self.executable}' is not available."
             )
 
         with tempfile.TemporaryDirectory(prefix="air-dv-docling-") as output_dir:
@@ -470,7 +489,19 @@ class DoclingPdfNormalizer:
                 "--image-export-mode",
                 "placeholder",
             ]
-            completed = subprocess.run(command, capture_output=True, text=True, check=False)
+            try:
+                completed = subprocess.run(
+                    command,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    timeout=self.timeout_seconds,
+                )
+            except subprocess.TimeoutExpired:
+                return self._failed_document(
+                    source_path,
+                    f"Docling extraction exceeded the {self.timeout_seconds}-second timeout.",
+                )
             output_path = Path(output_dir, f"{source_path.stem}.md")
             if completed.returncode != 0:
                 detail = completed.stderr.strip() or completed.stdout.strip() or "Unknown extractor error."
