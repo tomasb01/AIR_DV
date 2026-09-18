@@ -49,8 +49,11 @@ Start the local upload UI from the project directory:
 ./air-dv-ui
 ```
 
-Then open `http://127.0.0.1:8000` in a browser. Uploaded files are kept only in a temporary
-local directory for the duration of the analysis and are then deleted.
+Then open `http://127.0.0.1:8000` in a browser. The result shows the text-only normalized
+"What AI sees" view and provides local downloads of the Markdown report, AI view, and JSON
+result. Uploaded files are kept only in a temporary local directory for the duration of the
+analysis and are then deleted; generated downloads remain only in the local app's memory for
+15 minutes.
 
 ## Product documents
 

@@ -3,28 +3,89 @@
 from __future__ import annotations
 
 import html
+import json
 import shutil
 import tempfile
+import time
+from dataclasses import dataclass
 from pathlib import Path
+from secrets import token_urlsafe
 
 import uvicorn
 from fastapi import FastAPI, File, UploadFile
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 
 from air_dv.analysis import analyse_file
 from air_dv.models import AnalysisResult, Finding, Severity
 from air_dv.remediation import suggested_change
-from air_dv.reporting import check_outcomes
+from air_dv.reporting import check_outcomes, render_markdown_report
 
 
 _SUPPORTED_SUFFIXES = {".md", ".docx", ".pdf", ".xlsx"}
 _MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+_EXPORT_TTL_SECONDS = 15 * 60
+
+
+@dataclass(frozen=True)
+class _ExportBundle:
+    """One local, short-lived set of downloadable analysis exports."""
+
+    expires_at: float
+    files: dict[str, tuple[str, str, bytes]]
+
+
+class _ExportStore:
+    """Keep generated exports in memory only for the active local UI session."""
+
+    def __init__(self, ttl_seconds: int = _EXPORT_TTL_SECONDS) -> None:
+        self.ttl_seconds = ttl_seconds
+        self._bundles: dict[str, _ExportBundle] = {}
+
+    def add(self, result: AnalysisResult) -> str:
+        """Store exports temporarily and return an opaque identifier for local downloads."""
+
+        self._purge_expired()
+        stem = Path(result.document.filename).stem or "air-dv-result"
+        files = {
+            "report": (
+                f"{stem}-air-dv-report.md",
+                "text/markdown; charset=utf-8",
+                render_markdown_report(result).encode("utf-8"),
+            ),
+            "ai-view": (
+                f"{stem}-ai-view.md",
+                "text/markdown; charset=utf-8",
+                result.normalized_content.encode("utf-8"),
+            ),
+            "json": (
+                f"{stem}-air-dv-result.json",
+                "application/json; charset=utf-8",
+                (json.dumps(result.to_dict(), ensure_ascii=False, indent=2) + "\n").encode("utf-8"),
+            ),
+        }
+        export_id = token_urlsafe(24)
+        self._bundles[export_id] = _ExportBundle(time.monotonic() + self.ttl_seconds, files)
+        return export_id
+
+    def get(self, export_id: str, export_name: str) -> tuple[str, str, bytes] | None:
+        """Return a non-expired export, without retaining uploaded source files."""
+
+        self._purge_expired()
+        bundle = self._bundles.get(export_id)
+        return bundle.files.get(export_name) if bundle else None
+
+    def _purge_expired(self) -> None:
+        now = time.monotonic()
+        expired_ids = [key for key, bundle in self._bundles.items() if bundle.expires_at <= now]
+        for key in expired_ids:
+            del self._bundles[key]
 
 
 def create_app() -> FastAPI:
     """Create the local AIR-DV upload application."""
 
     app = FastAPI(title="AIR-DV", docs_url=None, redoc_url=None)
+    export_store = _ExportStore()
 
     @app.get("/", response_class=HTMLResponse)
     def upload_page() -> str:
@@ -51,7 +112,20 @@ def create_app() -> FastAPI:
         finally:
             document.file.close()
 
-        return _page(_result_panel(result))
+        export_id = export_store.add(result)
+        return _page(_result_panel(result, export_id))
+
+    @app.get("/exports/{export_id}/{export_name}")
+    def download_export(export_id: str, export_name: str) -> Response:
+        export = export_store.get(export_id, export_name)
+        if export is None:
+            return Response(status_code=404, content="This local export is no longer available.")
+        filename, media_type, content = export
+        return Response(
+            content=content,
+            media_type=media_type,
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
 
     return app
 
@@ -82,8 +156,9 @@ def _page(body: str) -> str:
     .subtitle {{ color: #536076; max-width: 650px; line-height: 1.55; }} .card {{ background: white; border: 1px solid #dce2ed; border-radius: 16px; padding: 28px; margin-top: 28px; box-shadow: 0 8px 30px #1b274014; }}
     .upload {{ border: 2px dashed #9cabc3; padding: 32px; border-radius: 12px; text-align: center; }} input {{ display: block; margin: 20px auto; max-width: 100%; }} button, .button {{ background: #2457d6; color: white; border: 0; border-radius: 9px; padding: 12px 18px; font-weight: 650; cursor: pointer; text-decoration: none; display: inline-block; }}
     .notice {{ color: #9e3124; background: #fff0ee; border-radius: 8px; padding: 12px; }} .status {{ font-size: 1.1rem; font-weight: 700; }} .needs-attention {{ color: #a04b00; }} .ready-for-review {{ color: #167044; }} .blocked {{ color: #b12c25; }}
-    .summary {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 20px 0; }} .metric {{ background: #f4f7fb; border-radius: 10px; padding: 14px; }} .metric strong {{ display: block; font-size: 1.35rem; }}
+    .summary {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 20px 0; }} .metric {{ background: #f4f7fb; border-radius: 10px; padding: 14px; }} .metric strong {{ display: block; font-size: 1.35rem; }} .downloads {{ display: flex; flex-wrap: wrap; gap: 10px; }} .button.secondary {{ background: #e7edf9; color: #1f478f; }}
     table {{ border-collapse: collapse; width: 100%; }} td, th {{ padding: 10px; border-bottom: 1px solid #e3e7ef; text-align: left; }} .finding {{ border-left: 4px solid #d4931d; background: #fffaf0; padding: 18px; border-radius: 0 10px 10px 0; margin-top: 16px; }} .finding.critical {{ border-color: #bd3b36; background: #fff4f3; }} .label {{ color: #536076; font-weight: 700; }} .evidence {{ background: #f2f4f8; padding: 10px; border-radius: 6px; white-space: pre-wrap; overflow-wrap: anywhere; }} .small {{ color: #536076; font-size: .9rem; }}
+    details {{ margin-top: 28px; }} summary {{ cursor: pointer; font-size: 1.35rem; font-weight: 700; }} pre {{ background: #172033; color: #eff4ff; border-radius: 10px; padding: 18px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; max-height: 620px; overflow: auto; }}
   </style>
 </head>
 <body><main>
@@ -105,7 +180,7 @@ def _upload_panel(error: str | None = None) -> str:
       </form></section>"""
 
 
-def _result_panel(result: AnalysisResult) -> str:
+def _result_panel(result: AnalysisResult, export_id: str) -> str:
     counts = {severity: len(result.findings_by_severity(severity)) for severity in Severity}
     status = _status(result)
     findings = "".join(_finding_card(number, finding) for number, finding in enumerate(result.findings, 1))
@@ -121,6 +196,17 @@ def _result_panel(result: AnalysisResult) -> str:
       <div class="summary"><div class="metric"><strong>{len(result.findings)}</strong>issues</div><div class="metric"><strong>{counts[Severity.CRITICAL]}</strong>critical</div><div class="metric"><strong>{counts[Severity.WARNING]}</strong>warnings</div></div>
       <h2>Check overview</h2><table><tbody>{overview}</tbody></table>
       <h2 style="margin-top:28px">Issues to fix</h2>{findings}
+      <details open><summary>What AI sees</summary>
+        <p class="small">This is the text-only normalized view used by AIR-DV. Images and visual objects are represented only by visible placeholders.</p>
+        <pre>{html.escape(result.normalized_content or "No normalized content was produced.")}</pre>
+      </details>
+      <h2 style="margin-top:28px">Downloads</h2>
+      <p class="small">Exports stay only in this local app's memory and expire after 15 minutes.</p>
+      <div class="downloads">
+        <a class="button secondary" href="/exports/{export_id}/report">Download report</a>
+        <a class="button secondary" href="/exports/{export_id}/ai-view">Download AI view</a>
+        <a class="button secondary" href="/exports/{export_id}/json">Download JSON</a>
+      </div>
       <p><a class="button" href="/">Analyse another document</a></p></section>"""
 
 

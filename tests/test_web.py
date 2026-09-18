@@ -2,6 +2,7 @@
 
 import unittest
 from pathlib import Path
+import re
 
 from fastapi.testclient import TestClient
 
@@ -33,6 +34,26 @@ class WebTests(unittest.TestCase):
         self.assertIn("Image has no text equivalent", response.text)
         self.assertIn("Markdown line 3", response.text)
         self.assertIn("Suggested change", response.text)
+        self.assertIn("What AI sees", response.text)
+        self.assertIn("This is the text-only normalized view", response.text)
+
+        export_id = re.search(r"/exports/([^/]+)/report", response.text).group(1)
+        report = self.client.get(f"/exports/{export_id}/report")
+        ai_view = self.client.get(f"/exports/{export_id}/ai-view")
+        json_export = self.client.get(f"/exports/{export_id}/json")
+
+        self.assertEqual(report.status_code, 200)
+        self.assertIn("# AIR-DV result", report.text)
+        self.assertEqual(ai_view.status_code, 200)
+        self.assertIn("![](architecture.png)", ai_view.text)
+        self.assertEqual(json_export.status_code, 200)
+        self.assertIn('"findings"', json_export.text)
+
+    def test_rejects_an_expired_or_unknown_export(self) -> None:
+        response = self.client.get("/exports/not-an-export/report")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertIn("no longer available", response.text)
 
     def test_rejects_an_unsupported_upload(self) -> None:
         response = self.client.post(

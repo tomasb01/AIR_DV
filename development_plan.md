@@ -6,7 +6,7 @@ Navazuje na [product_spec.md](product_spec.md). Cílem je ukázat během krátk�
 
 Produktový jazyk je **angličtina**. Anglicky budou všechny prvky, které mohou vidět uživatelé či budoucí integrace: UI, findings, doporučení, reporty, exportovaný AI view, CLI výstup a chybové zprávy. Stejně tak zdrojový kód používá anglické názvy a případné komentáře v angličtině. Lokalizace není součástí MVP.
 
-## Aktuální stav vývoje — 7. září 2026
+## Aktuální stav vývoje — 18. září 2026
 
 Poslední publikovaný commit před aktuálním UI blokem: `3d19b76` na větvi `main`.
 
@@ -25,7 +25,7 @@ Poslední publikovaný commit před aktuálním UI blokem: `3d19b76` na větvi `
 - V repozitáři jsou malé anonymizované fixture soubory; reálná lokální data jsou v `Data/` a jsou ignorována Gitem.
 - Zdrojové lokace uvádějí řádky Markdownu, odstavce Wordu, stránky PDF a sheet/cell range Excelu, pokud je lze bezpečně namapovat.
 - Aktuální ověření: **47/47 testů prochází**; integrační běh na 17stránkovém PDF vrací dva agregované warnings (37 vizuálních placeholderů a 6 OCR varování), nikoli desítky duplicitních findings.
-- **Fáze 4A:** základní lokální upload UI přes FastAPI. Přijímá `.md`, `.docx`, `.pdf`, `.xlsx`, volá existující `analyse_file()` a zobrazí status, přehled kontrol i akční findings. Upload je omezen na 50 MB a po analýze se smaže z dočasného adresáře. Ověření: **50/50 testů**, včetně HTTP uploadu přes lokální server.
+- **Fáze 4:** lokální FastAPI UI je dokončené pro MVP. Přijímá `.md`, `.docx`, `.pdf`, `.xlsx`, volá existující `analyse_file()` a zobrazuje status, přehled kontrol, akční findings i text-only náhled „What AI sees“. Nabízí lokální download Markdown reportu, AI view a JSON; upload se po analýze smaže a exporty jsou pouze v paměti lokální aplikace po dobu 15 minut. Upload je omezen na 50 MB. Ověření: **59/59 testů**, včetně HTTP uploadu a downloadů.
 - **Kalibrace vizuálů:** Word a PDF placeholdery se agregují do jednoho findingu. AIR-DV je nyní explicitně text-only: report rozlišuje počet vizuálních referencí a unikátních Word médií a doporučí buď textový ekvivalent, nebo multimodální ingest. Reálný Word s 1 040 referencemi / 434 unikátními médii vrací jeden warning místo 1 040 položek.
 
 ### Rozhodnutí a omezení
@@ -38,11 +38,11 @@ Poslední publikovaný commit před aktuálním UI blokem: `3d19b76` na větvi `
 
 ### Doporučený další blok
 
-**Fáze 4B — rozšíření výsledku UI:** nad existujícím uploadem zobrazit AI view a nabídnout stažení Markdown reportu / AI view / JSON. Až po ověření této části následuje Fáze 5: kalibrace nálezů na reálných souborech z `Data/`.
+**Confluence URL import POC:** vedle uploadu přidat cestu pro jednu Confluence page URL. Po read-only autentizaci lokálně načíst název, URL, hierarchii a obsah stránky, převést je do stejného AI view a transparentně označit makra, přílohy a neověřené vizuály. Přímý import závisí na rozhodnutí mezi Confluence Cloud a Data Center / Server. Po POC následuje Fáze 5: kalibrace nálezů na reálných souborech z `Data/`.
 
 ### Handoff pro příští restart
 
-- Začít **Fází 4, blok 4B**: rozšířit existující `air_dv.web` o AI view a exporty z již vytvořeného `AnalysisResult`; nepřepisovat logiku normalizace ani checků.
+- Začít **Confluence URL import POC**: přidat zdrojový adaptér vedle existujícího uploadu, nikoli do logiky normalizace a checků. Nejdříve vyjasnit variantu Confluence a způsob read-only autentizace.
 - Podporované uploady zůstávají `.md`, `.docx`, `.pdf`, `.xlsx`. Soubory i odvozené exporty musí zůstat dočasné a lokální.
 - Současný profil AI view je text-only. UI musí tuto skutečnost zachovat viditelnou; multimodální ingest je budoucí explicitně konfigurovatelný profil, nikoli tichý předpoklad.
 - Ověřit UI s jedním anonymizovaným fixture pro každý formát; jako dodatečný lokální integrační vzorek lze použít soubory v `Data/`, které nesmějí do Gitu.
