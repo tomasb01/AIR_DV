@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import html
 import json
-import shutil
 import tempfile
 import time
 from dataclasses import dataclass
@@ -12,10 +11,11 @@ from pathlib import Path
 from secrets import token_urlsafe
 
 import uvicorn
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import HTMLResponse, Response
 
 from air_dv.analysis import analyse_file
+from air_dv.confluence import ConfluenceOAuthConfig, ConfluencePageUrlError, parse_confluence_page_url
 from air_dv.models import AnalysisResult, Finding, Severity
 from air_dv.remediation import suggested_change
 from air_dv.reporting import check_outcomes, render_markdown_report
@@ -81,26 +81,25 @@ class _ExportStore:
             del self._bundles[key]
 
 
-def create_app() -> FastAPI:
+def create_app(confluence_oauth: ConfluenceOAuthConfig | None = None) -> FastAPI:
     """Create the local AIR-DV upload application."""
 
     app = FastAPI(title="AIR-DV", docs_url=None, redoc_url=None)
     export_store = _ExportStore()
+    confluence_oauth = confluence_oauth or ConfluenceOAuthConfig.from_environment()
 
     @app.get("/", response_class=HTMLResponse)
     def upload_page() -> str:
-        return _page(_upload_panel())
+        return _page(_source_panels())
 
     @app.post("/analyse", response_class=HTMLResponse)
     def analyse_upload(document: UploadFile = File(...)) -> str:
         filename = Path(document.filename or "").name
         suffix = Path(filename).suffix.casefold()
         if not filename or suffix not in _SUPPORTED_SUFFIXES:
-            return _page(
-                _upload_panel(
-                    "Choose a Markdown, Word, PDF, or Excel file (.md, .docx, .pdf, .xlsx)."
-                )
-            )
+            return _page(_source_panels(upload_error=(
+                "Choose a Markdown, Word, PDF, or Excel file (.md, .docx, .pdf, .xlsx)."
+            )))
 
         try:
             with tempfile.TemporaryDirectory(prefix="air-dv-upload-") as directory:
@@ -108,12 +107,39 @@ def create_app() -> FastAPI:
                 _save_upload(document, uploaded_path)
                 result = analyse_file(uploaded_path)
         except (OSError, ValueError) as error:
-            return _page(_upload_panel(f"Analysis could not be completed: {error}"))
+            return _page(_source_panels(upload_error=f"Analysis could not be completed: {error}"))
         finally:
             document.file.close()
 
         export_id = export_store.add(result)
         return _page(_result_panel(result, export_id))
+
+    @app.post("/confluence/prepare", response_class=HTMLResponse)
+    def prepare_confluence_page(page_url: str = Form(...)) -> str:
+        """Validate a page URL locally before OAuth is connected to the importer."""
+
+        try:
+            page = parse_confluence_page_url(page_url)
+        except ConfluencePageUrlError as error:
+            return _page(_source_panels(confluence_error=str(error), confluence_page_url=page_url))
+
+        if not confluence_oauth.is_configured:
+            missing = ", ".join(confluence_oauth.missing_fields)
+            return _page(_source_panels(
+                confluence_error=(
+                    "Confluence OAuth is not configured locally. Missing: "
+                    f"{missing}. No credentials or page content were sent."
+                ),
+                confluence_page_url=page_url,
+            ))
+
+        return _page(_source_panels(
+            confluence_notice=(
+                f"Page ID {page.page_id} in space {page.space_key} is ready for the OAuth "
+                "connection flow. Page retrieval will be enabled in the next POC block."
+            ),
+            confluence_page_url=page_url,
+        ))
 
     @app.get("/exports/{export_id}/{export_name}")
     def download_export(export_id: str, export_name: str) -> Response:
@@ -168,6 +194,17 @@ def _page(body: str) -> str:
 </main></body></html>"""
 
 
+def _source_panels(
+    upload_error: str | None = None,
+    confluence_error: str | None = None,
+    confluence_notice: str | None = None,
+    confluence_page_url: str = "",
+) -> str:
+    return _upload_panel(upload_error) + _confluence_panel(
+        confluence_error, confluence_notice, confluence_page_url
+    )
+
+
 def _upload_panel(error: str | None = None) -> str:
     notice = f'<p class="notice">{html.escape(error)}</p>' if error else ""
     return f"""<section class="card"><h2>Analyse a document</h2>
@@ -177,6 +214,22 @@ def _upload_panel(error: str | None = None) -> str:
         <input id="document" name="document" type="file" accept=".md,.docx,.pdf,.xlsx" required>
         <p class="small">Markdown, Word, PDF, or Excel · maximum 50 MB</p>
         <button type="submit">Analyse document</button>
+      </form></section>"""
+
+
+def _confluence_panel(
+    error: str | None = None, notice: str | None = None, page_url: str = ""
+) -> str:
+    error_html = f'<p class="notice">{html.escape(error)}</p>' if error else ""
+    notice_html = f'<p class="small">{html.escape(notice)}</p>' if notice else ""
+    return f"""<section class="card"><h2>Confluence page URL</h2>
+      <p class="small">Data Center page import uses a separate read-only OAuth connection. AIR-DV never reads browser cookies.</p>
+      {error_html}{notice_html}
+      <form action="/confluence/prepare" method="post" class="upload">
+        <label for="page-url">Paste a Confluence page URL</label>
+        <input id="page-url" name="page_url" type="url" value="{html.escape(page_url, quote=True)}" placeholder="https://wiki.example.com/confluence/spaces/SPACE/pages/123/Page-title" required>
+        <p class="small">Only the URL is validated at this step. No page content is sent until OAuth is connected.</p>
+        <button type="submit">Prepare Confluence connection</button>
       </form></section>"""
 
 

@@ -20,6 +20,21 @@ class WebTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("Analyse a document", response.text)
         self.assertIn("processed locally and deleted", response.text)
+        self.assertIn("Confluence page URL", response.text)
+
+    def test_validates_a_confluence_page_url_without_sending_page_content(self) -> None:
+        response = self.client.post(
+            "/confluence/prepare",
+            data={
+                "page_url": (
+                    "https://wiki.example.com/confluence/spaces/NCL/pages/5422764848/Example-page"
+                )
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Confluence OAuth is not configured locally", response.text)
+        self.assertIn("No credentials or page content were sent", response.text)
 
     def test_uploads_a_supported_document_and_renders_actionable_result(self) -> None:
         fixture_path = self.fixture_directory / "missing_image_alt.md"

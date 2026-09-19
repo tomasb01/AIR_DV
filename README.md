@@ -55,6 +55,24 @@ result. Uploaded files are kept only in a temporary local directory for the dura
 analysis and are then deleted; generated downloads remain only in the local app's memory for
 15 minutes.
 
+### Confluence Data Center POC
+
+The UI accepts a Confluence Data Center page URL in the `/spaces/<space>/pages/<page-id>` form
+and validates it locally. Page retrieval is enabled only after read-only OAuth is configured;
+the current preparation step never sends page content or browser cookies to Confluence.
+
+When the corporate OAuth client is available, keep its settings outside Git and provide them in
+the local environment:
+
+```bash
+export AIR_DV_CONFLUENCE_OAUTH_CLIENT_ID="..."
+export AIR_DV_CONFLUENCE_OAUTH_AUTHORIZATION_URL="https://..."
+export AIR_DV_CONFLUENCE_OAUTH_TOKEN_URL="https://..."
+export AIR_DV_CONFLUENCE_OAUTH_SCOPE="..."
+```
+
+Do not place access tokens, client secrets, or browser cookies in the repository.
+
 ## Product documents
 
 - [Product specification](product_spec.md)
